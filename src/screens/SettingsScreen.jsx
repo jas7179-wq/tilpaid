@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { generateId, formatCurrency } from '../lib/utils';
 import * as db from '../lib/db';
+import * as api from '../lib/api';
+import * as sync from '../lib/sync';
 import BottomNav from '../components/BottomNav';
-import { Plus, Pencil, Trash2, X, Check, RotateCcw, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, RotateCcw, Download, Cloud, CloudOff, RefreshCw, LogOut } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
 const PRESET_COLORS = [
@@ -24,6 +26,27 @@ const ACCOUNT_TYPES = [
   { type: 'savings', label: 'Savings' },
   { type: 'money-market', label: 'Money Market' },
 ];
+
+// ── Inline SVG Icons for Auth Buttons ──
+
+function AppleLogo({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+      <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+    </svg>
+  );
+}
+
+function GoogleLogo({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+  );
+}
 
 export default function SettingsScreen() {
   const { categories, activeAccount, payFrequency, nextPayDate, resetAccount, accounts, deleteAccountById, canAddAccount, isPremium } = useApp();
@@ -45,6 +68,13 @@ export default function SettingsScreen() {
   const [showReset, setShowReset] = useState(false);
   const [resetBalance, setResetBalance] = useState('');
 
+  // Auth state
+  const [isSignedIn, setIsSignedIn] = useState(api.isAuthenticated());
+  const [userProfile, setUserProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(sync.getSyncStatus());
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Confirm modal states
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null, title: '', message: '', confirmWord: null, confirmLabel: '' });
 
@@ -53,6 +83,67 @@ export default function SettingsScreen() {
   const handleConfirmAction = async () => {
     if (confirmModal.action) await confirmModal.action();
     closeConfirm();
+  };
+
+  // ── Auth Handlers ──
+
+  const handleAppleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      // Apple Sign In via Sign In with Apple JS SDK
+      // This will be wired up when Apple Developer credentials are ready
+      // For now, show a placeholder
+      alert('Apple Sign In will be available soon — waiting on developer account setup.');
+    } catch (err) {
+      console.error('Apple sign-in failed:', err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      // Google Sign In via Google Identity Services
+      // This will be wired up when Google OAuth credentials are ready
+      // For now, show a placeholder
+      alert('Google Sign In will be available soon — waiting on developer account setup.');
+    } catch (err) {
+      console.error('Google sign-in failed:', err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    api.signOut();
+    setIsSignedIn(false);
+    setUserProfile(null);
+    setSyncStatus(sync.getSyncStatus());
+  };
+
+  const handleSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await sync.initialSync();
+      setSyncStatus(sync.getSyncStatus());
+    } catch (err) {
+      console.error('Sync failed:', err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Format last sync time
+  const formatSyncTime = (date) => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diff = now - date;
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    return date.toLocaleDateString();
   };
 
   // CSV Export
@@ -162,6 +253,93 @@ export default function SettingsScreen() {
             className="text-sm text-brand-500 font-medium">
             Done
           </button>
+        </div>
+
+        {/* ── Sign In / Account Section ── */}
+        <div className="mb-6">
+          <p className="text-xs text-text-secondary uppercase tracking-wider mb-2">Account & Sync</p>
+
+          {!isSignedIn ? (
+            /* ── Signed Out State ── */
+            <div className="bg-surface-card rounded-[14px] border border-border overflow-hidden">
+              <div className="px-4 pt-4 pb-3">
+                <div className="flex items-center gap-2.5 mb-1.5">
+                  <CloudOff size={18} className="text-text-muted" />
+                  <p className="text-sm font-medium">Sign in to sync your data</p>
+                </div>
+                <p className="text-xs text-text-muted leading-relaxed pl-[30px]">
+                  Back up your data and access it across devices. Your data always stays on your device first.
+                </p>
+              </div>
+
+              <div className="px-4 pb-4 flex flex-col gap-2.5">
+                {/* Apple Sign In Button */}
+                <button
+                  onClick={handleAppleSignIn}
+                  disabled={authLoading}
+                  className="w-full flex items-center justify-center gap-2.5 py-3 rounded-[10px] bg-black text-white text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50"
+                >
+                  <AppleLogo className="w-[18px] h-[18px]" />
+                  Sign in with Apple
+                </button>
+
+                {/* Google Sign In Button */}
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={authLoading}
+                  className="w-full flex items-center justify-center gap-2.5 py-3 rounded-[10px] bg-white text-text border border-border text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50"
+                >
+                  <GoogleLogo className="w-[18px] h-[18px]" />
+                  Sign in with Google
+                </button>
+              </div>
+
+              <div className="px-4 pb-3">
+                <p className="text-[10px] text-text-muted text-center leading-relaxed">
+                  We never see your password. Authentication is handled securely by Apple and Google.
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* ── Signed In State ── */
+            <div className="bg-surface-card rounded-[14px] border border-border overflow-hidden">
+              {/* User info + sync status */}
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 rounded-full bg-brand-50 border border-brand-200 flex items-center justify-center shrink-0">
+                    <Cloud size={16} className="text-brand-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{userProfile?.name || userProfile?.email || 'Signed in'}</p>
+                    <p className="text-[11px] text-text-muted">
+                      Synced: {formatSyncTime(syncStatus.lastSync)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sync button */}
+                <button
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 disabled:opacity-50"
+                >
+                  <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                  {isSyncing ? 'Syncing...' : 'Sync'}
+                </button>
+              </div>
+
+              {/* Sign out */}
+              <div className="border-t border-border-light">
+                <button
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left"
+                >
+                  <LogOut size={14} className="text-text-muted" />
+                  <span className="text-xs text-text-secondary font-medium">Sign out</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Accounts — one card per account with inline pay settings */}
