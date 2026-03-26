@@ -1,0 +1,315 @@
+import { format, formatDistanceToNow, isToday, isYesterday, parseISO, addDays, addWeeks, addMonths, startOfDay, endOfDay, isBefore, isAfter, isSameDay } from 'date-fns';
+import { v4 as uuidv4 } from 'uuid';
+
+export function generateId() {
+  return uuidv4();
+}
+
+export function formatCurrency(amount) {
+  const abs = Math.abs(amount);
+  const formatted = abs.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return `${amount < 0 ? '-' : ''}$${formatted}`;
+}
+
+export function formatCurrencyShort(amount) {
+  const abs = Math.abs(amount);
+  if (abs >= 1000) {
+    return `${amount < 0 ? '-' : ''}$${(abs / 1000).toFixed(1)}k`;
+  }
+  return formatCurrency(amount);
+}
+
+export function formatDate(dateStr) {
+  const date = typeof dateStr === 'string' ? parseISO(dateStr) : dateStr;
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'MMM d');
+}
+
+export function formatDateFull(dateStr) {
+  const date = typeof dateStr === 'string' ? parseISO(dateStr) : dateStr;
+  return format(date, 'MMMM d, yyyy');
+}
+
+export function formatDateRelative(dateStr) {
+  const date = typeof dateStr === 'string' ? parseISO(dateStr) : dateStr;
+  return formatDistanceToNow(date, { addSuffix: true });
+}
+
+export function todayISO() {
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
+export function daysUntil(dateStr) {
+  const target = typeof dateStr === 'string' ? parseISO(dateStr) : new Date(dateStr);
+  const now = new Date();
+  const targetClean = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const nowClean = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = targetClean.getTime() - nowClean.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+export function computeRunningBalances(transactions, startingBalance) {
+  // Sort all transactions chronologically
+  const sorted = [...transactions].sort(
+    (a, b) => new Date(a.date) - new Date(b.date) || a.createdAt - b.createdAt
+  );
+
+  // Find the most recent adjustment (anchor point)
+  let anchorIndex = -1;
+  let anchorBalance = startingBalance;
+
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (sorted[i].isAdjustment) {
+      anchorIndex = i;
+      break;
+    }
+  }
+
+  // If there's an anchor, compute its balance by walking forward from start
+  if (anchorIndex >= 0) {
+    let bal = startingBalance;
+    for (let i = 0; i <= anchorIndex; i++) {
+      bal += sorted[i].amount;
+    }
+    anchorBalance = Math.round(bal * 100) / 100;
+  }
+
+  // Now build the display list with running balances
+  let balance = startingBalance;
+  const withBalances = sorted.map((tx, i) => {
+    balance += tx.amount;
+    const isPreAnchor = anchorIndex >= 0 && i < anchorIndex;
+    return {
+      ...tx,
+      runningBalance: Math.round(balance * 100) / 100,
+      isPreAnchor,
+      isLocked: isPreAnchor,
+    };
+  });
+
+  return withBalances.reverse();
+}
+
+// Compute current balance using anchor point model:
+// Find last adjustment, use it as anchor, only add transactions after it
+export function computeCurrentBalance(transactions, startingBalance) {
+  const sorted = [...transactions].sort(
+    (a, b) => new Date(a.date) - new Date(b.date) || a.createdAt - b.createdAt
+  );
+
+  // Find last adjustment
+  let anchorIndex = -1;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (sorted[i].isAdjustment) {
+      anchorIndex = i;
+      break;
+    }
+  }
+
+  if (anchorIndex === -1) {
+    // No adjustments — simple sum from starting balance
+    const total = sorted.reduce((sum, t) => sum + t.amount, 0);
+    return Math.round((startingBalance + total) * 100) / 100;
+  }
+
+  // Walk to anchor to get anchor balance
+  let anchorBalance = startingBalance;
+  for (let i = 0; i <= anchorIndex; i++) {
+    anchorBalance += sorted[i].amount;
+  }
+  anchorBalance = Math.round(anchorBalance * 100) / 100;
+
+  // Only add transactions AFTER the anchor
+  let current = anchorBalance;
+  for (let i = anchorIndex + 1; i < sorted.length; i++) {
+    current += sorted[i].amount;
+  }
+
+  return Math.round(current * 100) / 100;
+}
+
+export function createTransaction({
+  accountId,
+  amount,
+  description,
+  categoryId,
+  date,
+  type = 'expense',
+  isAdjustment = false,
+  note = '',
+}) {
+  return {
+    id: generateId(),
+    accountId,
+    amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
+    description,
+    categoryId,
+    date: date || todayISO(),
+    type,
+    isAdjustment,
+    note,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+export function createAccount({ name, type, balance, payFrequency, nextPayDate }) {
+  return {
+    id: generateId(),
+    name,
+    type,
+    startingBalance: balance,
+    currentBalance: balance,
+    payFrequency: payFrequency || null,
+    nextPayDate: nextPayDate || null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    lastReconciledAt: null,
+  };
+}
+
+export function createReconciliation({ accountId, balance, matched }) {
+  return {
+    id: generateId(),
+    accountId,
+    balance,
+    matched,
+    date: todayISO(),
+    createdAt: Date.now(),
+  };
+}
+
+// ── Recurring Transactions ──
+
+export function createRecurringTransaction({
+  accountId,
+  description,
+  amount,
+  categoryId,
+  type = 'expense',
+  frequency = 'monthly',
+  startDate,
+  dayOfMonth,
+  isAutoDraft = false,
+  isApproximate = false,
+  reminderDays = 2,
+}) {
+  return {
+    id: generateId(),
+    accountId,
+    description,
+    amount: type === 'expense' ? -Math.abs(amount) : Math.abs(amount),
+    categoryId,
+    type,
+    frequency,
+    startDate: startDate || todayISO(),
+    dayOfMonth: dayOfMonth || null,
+    isAutoDraft,
+    isApproximate,
+    reminderDays,
+    isActive: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+export function getNextOccurrence(recurring, afterDate) {
+  // afterDate is exclusive — find the first occurrence AFTER afterDate
+  // But when called with yesterday's date, today is included
+  const after = afterDate ? startOfDay(parseISO(afterDate)) : startOfDay(new Date());
+  const start = startOfDay(parseISO(recurring.startDate));
+  let next;
+
+  switch (recurring.frequency) {
+    case 'weekly':
+      next = new Date(start);
+      while (isBefore(next, after)) {
+        next = addWeeks(next, 1);
+      }
+      break;
+
+    case 'biweekly':
+      next = new Date(start);
+      while (isBefore(next, after)) {
+        next = addWeeks(next, 2);
+      }
+      break;
+
+    case 'monthly':
+      next = new Date(start);
+      while (isBefore(next, after)) {
+        next = addMonths(next, 1);
+      }
+      break;
+
+    case 'semi-monthly': {
+      const days = recurring.dayOfMonth ? recurring.dayOfMonth.split(',').map(Number) : [1, 15];
+      const year = after.getFullYear();
+      const month = after.getMonth();
+
+      const candidates = [];
+      for (let m = month - 1; m <= month + 2; m++) {
+        for (const d of days) {
+          const candidate = new Date(year, m, d);
+          if (!isBefore(candidate, after)) {
+            candidates.push(candidate);
+          }
+        }
+      }
+      candidates.sort((a, b) => a - b);
+      next = candidates[0] || addMonths(after, 1);
+      break;
+    }
+
+    default:
+      next = addMonths(new Date(start), 1);
+  }
+
+  return format(next, 'yyyy-MM-dd');
+}
+
+export function generateUpcomingOccurrences(recurring, lookAheadDays = 35) {
+  if (!recurring.isActive) return [];
+
+  const today = startOfDay(new Date());
+  const endDate = addDays(today, lookAheadDays);
+  const occurrences = [];
+
+  // Start from today so we include items due today
+  let searchFrom = todayISO();
+
+  for (let i = 0; i < 20; i++) {
+    const nextDate = getNextOccurrence(recurring, searchFrom);
+    const nextParsed = parseISO(nextDate);
+
+    if (isAfter(nextParsed, endDate)) break;
+
+    const days = daysUntil(nextDate);
+
+    occurrences.push({
+      id: `upcoming-${recurring.id}-${nextDate}`,
+      recurringId: recurring.id,
+      accountId: recurring.accountId,
+      description: recurring.description,
+      amount: recurring.amount,
+      categoryId: recurring.categoryId,
+      type: recurring.type,
+      date: nextDate,
+      daysOut: days,
+      isAutoDraft: recurring.isAutoDraft,
+      isApproximate: recurring.isApproximate,
+      isUpcoming: true,
+      frequency: recurring.frequency,
+    });
+
+    // Advance past this date so next iteration finds the following occurrence
+    const dayAfter = addDays(nextParsed, 1);
+    searchFrom = format(dayAfter, 'yyyy-MM-dd');
+  }
+
+  return occurrences;
+}
