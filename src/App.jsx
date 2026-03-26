@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
+import LandingPage from './screens/LandingPage';
 import SetupScreen from './screens/SetupScreen';
 import HomeScreen from './screens/HomeScreen';
 import AddTransactionScreen from './screens/AddTransactionScreen';
@@ -49,13 +50,27 @@ function AppRoutes() {
   );
 }
 
+function AppContent() {
+  return (
+    <Routes>
+      {/* Landing page — full width, no container constraint */}
+      <Route path="/welcome" element={<LandingPage />} />
+      
+      {/* App routes — wrapped in mobile container */}
+      <Route path="/*" element={
+        <div className="max-w-md mx-auto min-h-screen bg-surface">
+          <AppRoutes />
+        </div>
+      } />
+    </Routes>
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <div className="max-w-md mx-auto min-h-screen bg-surface">
-          <AppRoutes />
-        </div>
+        <AppContent />
       </AppProvider>
     </BrowserRouter>
   );

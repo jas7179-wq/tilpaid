@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TilPaid</string>
+    <string name="title_activity_main">TilPaid</string>
+    <string name="package_name">com.midlinedigital.tilpaid</string>
+    <string name="custom_url_scheme">com.midlinedigital.tilpaid</string>
+</resources>
