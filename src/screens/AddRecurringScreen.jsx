@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from '../components/Toast';
 import { useApp } from '../context/AppContext';
 import { todayISO, createRecurringTransaction } from '../lib/utils';
 import * as db from '../lib/db';
@@ -63,6 +64,7 @@ export default function AddRecurringScreen() {
     });
 
     await db.saveRecurringTransaction(recurring);
+    toast('Recurring item saved!');
     navigate('/upcoming');
   };
 

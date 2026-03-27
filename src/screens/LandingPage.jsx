@@ -110,7 +110,7 @@ export default function LandingPage() {
           <div className="absolute -top-20 -right-20 w-80 h-80 rounded-full opacity-[0.08]" 
             style={{ background: 'radial-gradient(circle, #1D9E75 0%, transparent 70%)' }} />
           <div className="absolute -bottom-32 -left-20 w-96 h-96 rounded-full opacity-[0.06]" 
-            style={{ background: 'radial-gradient(circle, #378ADD 0%, transparent 70%)' }} />
+            style={{ background: 'radial-gradient(circle, #4A8B3F 0%, transparent 70%)' }} />
         </div>
 
         <div className="max-w-lg mx-auto px-6 pt-14 pb-10 relative">
@@ -150,7 +150,7 @@ export default function LandingPage() {
           <div className="flex justify-center">
             <div className="relative">
               <div className="absolute -inset-4 rounded-[40px] opacity-20"
-                style={{ background: 'linear-gradient(135deg, #2DBF7E 0%, #378ADD 100%)', filter: 'blur(24px)' }} />
+                style={{ background: 'linear-gradient(135deg, #4A8B3F 0%, #2DBF7E 100%)', filter: 'blur(24px)' }} />
               <PhoneMockup />
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function LandingPage() {
               icon: Shield,
               title: 'Private by default',
               desc: 'Your data stays on your device. No bank linking ever.',
-              color: '#378ADD',
+              color: '#4A8B3F',
             },
             {
               icon: CalendarClock,

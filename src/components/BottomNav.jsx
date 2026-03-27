@@ -16,11 +16,14 @@ export default function BottomNav() {
       <span className={`text-[9px] font-medium ${isActive(path) ? 'text-brand-500' : 'text-text-muted'}`}>
         {label}
       </span>
+      {isActive(path) && (
+        <div className="w-1 h-1 rounded-full bg-brand-500 -mt-0.5" />
+      )}
     </button>
   );
 
   return (
-    <div className="sticky bottom-0 flex items-center justify-evenly py-3 pb-6 border-t border-border bg-surface-card z-10">
+    <div className="sticky bottom-0 flex items-center justify-evenly py-3 pb-6 border-t border-border bg-surface-card/90 backdrop-blur-sm z-10">
       <NavItem path="/" icon={List} label="Ledger" />
       <NavItem path="/add" icon={PlusCircle} label="Add" />
       <NavItem path="/upcoming" icon={CalendarClock} label="Upcoming" />

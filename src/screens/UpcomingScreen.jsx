@@ -291,9 +291,9 @@ export default function UpcomingScreen() {
                           onClick={() => navigate(`/edit-recurring/${item.recurringId}`)}
                           className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium shrink-0 cursor-pointer"
                           style={{
-                            backgroundColor: isDue ? '#F59E0B18' : isDueSoon ? '#3B82F612' : `${color}12`,
+                            backgroundColor: isDue ? '#F59E0B18' : isDueSoon ? '#4A8B3F12' : `${color}12`,
                             color: isDue ? '#D97706' : isDueSoon ? '#2563EB' : color,
-                            border: isDue ? '1.5px solid #F59E0B50' : isDueSoon ? '1.5px solid #3B82F630' : `1px dashed ${color}40`,
+                            border: isDue ? '1.5px solid #F59E0B50' : isDueSoon ? '1.5px solid #4A8B3F30' : `1px dashed ${color}40`,
                           }}>
                           {isDue
                             ? <AlertTriangle size={14} />

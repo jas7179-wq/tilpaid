@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from '../components/Toast';
 import { useApp } from '../context/AppContext';
 import { todayISO } from '../lib/utils';
 import * as db from '../lib/db';
@@ -88,12 +89,14 @@ export default function EditRecurringScreen() {
     };
 
     await db.saveRecurringTransaction(updated);
+    toast('Changes saved!');
     navigate('/upcoming');
   };
 
   const handleDelete = async () => {
     if (confirm(`Delete recurring "${description}"? This cannot be undone.`)) {
       await db.deleteRecurringTransaction(id);
+      toast('Recurring item deleted');
       navigate('/upcoming');
     }
   };

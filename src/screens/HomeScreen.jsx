@@ -79,7 +79,6 @@ export default function HomeScreen() {
       allUpcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
 
       // De-duplicate: skip recurring items that already have a matching manual entry
-      // Check both scheduled AND recent transactions (for "post early" cases)
       const allManualDescs = new Set(
         transactionsWithBalances
           .filter(tx => !tx.isAdjustment)
@@ -90,7 +89,6 @@ export default function HomeScreen() {
       const autoScheduled = allUpcoming
         .filter(item => {
           if (item.date <= today) return false;
-          // Check if any manual transaction has the same description and is within 7 days of this date
           const hasMatch = transactionsWithBalances.some(tx => {
             if (tx.isAdjustment) return false;
             if (tx.description?.toLowerCase() !== item.description?.toLowerCase()) return false;
@@ -148,10 +146,8 @@ export default function HomeScreen() {
 
   // Scheduled: manual entries always visible, recurring limited to before payday
   const allScheduled = useMemo(() => {
-    // Manual scheduled entries are ALWAYS shown — user entered them, they should see them
     const manualItems = manualScheduled.map(tx => ({ ...tx, isRecurringAuto: false }));
 
-    // Recurring auto-populated items: filter to before payday or 30-day fallback
     let recurringItems;
     if (effectivePayDate) {
       recurringItems = recurringScheduled.filter(item => item.date <= effectivePayDate);
@@ -195,52 +191,85 @@ export default function HomeScreen() {
 
   return (
     <div className="min-h-screen flex flex-col bg-surface">
-      {/* Header */}
-      <div className="px-5 pt-5 pb-3">
-        <div className="flex justify-between items-center mb-2">
+      {/* ── Header ── */}
+      <div className="px-5 pt-5 pb-2">
+        {/* Top row: account + reconcile */}
+        <div className="flex justify-between items-center mb-3">
           <AccountSwitcher />
           <button
             onClick={() => navigate('/reconcile')}
-            className="flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-xl bg-surface-card border border-border active:scale-95 transition-transform"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card border border-border active:scale-95 transition-transform"
           >
-            <CheckCircle size={14} className="text-text-secondary" />
-            <span className="text-[8px] text-text-muted font-medium">Check</span>
+            <CheckCircle size={13} className="text-text-muted" />
+            <span className="text-[10px] text-text-muted font-medium">Check</span>
           </button>
         </div>
 
-        {/* Hero: TilPaid balance */}
-        <div className="flex items-end justify-between mb-0.5">
-          <p className={`text-[34px] font-bold tracking-tight leading-none ${tilPaidColor}`}>
+        {/* Hero balance */}
+        <div className="mb-1">
+          <p className={`text-[38px] font-bold tracking-tight leading-none ${tilPaidColor}`}>
             {formatCurrency(tilPaidBalance)}
           </p>
-          {daysTilPay !== null && daysTilPay > 0 && (
-            <p className="text-[12px] text-brand-500 font-semibold mb-1">{daysTilPay}d til pay</p>
-          )}
-          {daysTilPay === 0 && (
-            <p className="text-[12px] text-success-500 font-semibold mb-1">Payday!</p>
-          )}
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] text-brand-500 font-semibold">TilPaid</span>
+            {daysTilPay !== null && daysTilPay > 0 && (
+              <>
+                <span className="text-text-muted text-[11px]">·</span>
+                <span className="text-[11px] text-brand-500 font-semibold">{daysTilPay}d til pay</span>
+              </>
+            )}
+            {daysTilPay === 0 && (
+              <>
+                <span className="text-text-muted text-[11px]">·</span>
+                <span className="text-[11px] text-success-500 font-semibold">Payday!</span>
+              </>
+            )}
+          </div>
         </div>
-        <p className="text-[11px] text-brand-500 font-semibold tracking-wide">TilPaid</p>
 
-        <div className="flex justify-between items-center mt-1.5 mb-3">
-          <p className="text-[12px] text-text-muted">
-            Bank balance: {formatCurrency(actualBalance)}
-          </p>
+        {/* Info row */}
+        <div className="flex items-center gap-3 mt-2 mb-2 py-2.5 px-3.5 rounded-[14px] bg-surface-card border border-border shadow-sm">
+          <div className="flex-1">
+            <p className="text-[10px] text-text-muted uppercase tracking-wider">Bank balance</p>
+            <p className="text-[13px] font-medium mt-0.5">{formatCurrency(actualBalance)}</p>
+          </div>
           {showAfterPayday && (
-            <p className={`text-[12px] ${afterPayday < 0 ? 'text-danger-400' : 'text-text-muted'}`}>
-              After payday: {formatCurrency(afterPayday)}
-            </p>
+            <>
+              <div className="w-px h-7 bg-border" />
+              <div className="flex-1">
+                <p className="text-[10px] text-text-muted uppercase tracking-wider">After payday</p>
+                <p className={`text-[13px] font-medium mt-0.5 ${afterPayday < 0 ? 'text-danger-500' : ''}`}>
+                  {formatCurrency(afterPayday)}
+                </p>
+              </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* Ledger */}
+      {/* ── Ledger ── */}
       <div className="flex-1 px-4 pb-4">
         {transactionsWithBalances.length === 0 && recurringScheduled.length === 0 ? (
           <div>
-            <div className="text-center py-10">
-              <p className="text-text-muted text-sm">No transactions yet</p>
-              <p className="text-text-muted text-xs mt-1">Tap Add to log your first expense</p>
+            <div className="text-center py-10 px-6">
+              {/* Empty state illustration */}
+              <div className="mx-auto mb-5 w-20 h-20 relative">
+                <div className="w-20 h-20 rounded-2xl bg-brand-50 border border-brand-200/50 flex items-center justify-center">
+                  <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="4" y="8" width="28" height="22" rx="4" stroke="#4A8B3F" strokeWidth="1.5" strokeDasharray="3 2" fill="#EEF4E810"/>
+                    <line x1="10" y1="15" x2="26" y2="15" stroke="#B0CFA0" strokeWidth="1.5" strokeLinecap="round"/>
+                    <line x1="10" y1="20" x2="22" y2="20" stroke="#D4E4C8" strokeWidth="1.5" strokeLinecap="round"/>
+                    <line x1="10" y1="25" x2="18" y2="25" stroke="#D4E4C8" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="27" cy="10" r="6" fill="#4A8B3F"/>
+                    <line x1="27" y1="7.5" x2="27" y2="12.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                    <line x1="24.5" y1="10" x2="29.5" y2="10" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </div>
+              </div>
+              <p className="text-text-secondary text-sm font-medium mb-1">No transactions yet</p>
+              <p className="text-text-muted text-xs leading-relaxed">
+                Tap <span className="text-brand-500 font-medium">Add</span> in the nav below to log your first expense
+              </p>
             </div>
             <StartingBalanceLine account={activeAccount} />
           </div>
@@ -278,8 +307,8 @@ export default function HomeScreen() {
                         onClick={() => setActionItem(item)}
                         className="flex items-center gap-3 py-3 px-1 border-b border-dashed border-border-light bg-brand-50/20 cursor-pointer select-none"
                       >
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium shrink-0"
-                          style={{ backgroundColor: '#3B82F610', color: '#3B82F6', border: '1px dashed #3B82F640' }}>
+                        <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
+                          style={{ backgroundColor: '#4A8B3F10', color: '#4A8B3F', border: '1px dashed #4A8B3F40' }}>
                           <CalendarClock size={14} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -329,8 +358,8 @@ export default function HomeScreen() {
 
       {/* Recurring action sheet */}
       {actionItem && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" onClick={() => setActionItem(null)}>
-          <div className="bg-surface-card w-full max-w-md rounded-t-2xl px-5 pt-5 pb-8" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center overlay-enter" onClick={() => setActionItem(null)}>
+          <div className="bg-surface-card w-full max-w-md rounded-t-2xl px-5 pt-5 pb-8 sheet-enter" onClick={e => e.stopPropagation()}>
             <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
             <p className="text-base font-semibold mb-1">{actionItem.description}</p>
             <p className="text-xs text-text-muted mb-5">

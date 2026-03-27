@@ -68,8 +68,8 @@ export default function OnboardingOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
-      <div className="bg-surface-card w-full max-w-md rounded-t-2xl px-6 pt-6 pb-8">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center overlay-enter">
+      <div className="bg-surface-card w-full max-w-md rounded-t-2xl px-6 pt-6 pb-8 sheet-enter">
         {/* Skip */}
         <div className="flex justify-end mb-2">
           <button onClick={handleDismiss} className="text-xs text-text-muted flex items-center gap-1">
@@ -90,7 +90,7 @@ export default function OnboardingOverlay() {
         <div className="flex justify-center gap-1.5 mb-5">
           {TIPS.map((_, i) => (
             <div key={i} className={`w-2 h-2 rounded-full transition-colors ${
-              i === currentStep ? 'bg-brand-500' : i < currentStep ? 'bg-brand-200' : 'bg-gray-200'
+              i === currentStep ? 'bg-brand-500' : i < currentStep ? 'bg-brand-200' : 'bg-border'
             }`} />
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from '../components/Toast';
 import { useApp } from '../context/AppContext';
 import { todayISO } from '../lib/utils';
 import { ChevronLeft, Trash2, Lock } from 'lucide-react';
@@ -92,11 +93,13 @@ export default function EditTransactionScreen() {
 
     await db.saveTransaction(updated);
     await refreshTransactions();
+    toast('Changes saved!');
     navigate('/');
   };
 
   const handleDelete = async () => {
     await deleteTransactionById(id);
+    toast('Transaction deleted');
     navigate('/');
   };
 

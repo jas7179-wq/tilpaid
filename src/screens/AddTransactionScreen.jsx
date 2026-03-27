@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '../components/Toast';
 import { useApp } from '../context/AppContext';
 import { todayISO } from '../lib/utils';
 import { ChevronLeft } from 'lucide-react';
@@ -76,6 +77,7 @@ export default function AddTransactionScreen() {
       date: selectedDate,
       type,
     });
+    toast('Transaction saved!');
     navigate('/');
   };
 

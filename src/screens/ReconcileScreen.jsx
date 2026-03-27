@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '../components/Toast';
 import { useApp } from '../context/AppContext';
 import { formatCurrency, formatDateRelative } from '../lib/utils';
 import { ChevronLeft } from 'lucide-react';
@@ -17,12 +18,14 @@ export default function ReconcileScreen() {
 
   const handleConfirmMatch = async () => {
     await reconcile({ balance: currentBalance, matched: true });
+    toast('Balance confirmed!');
     navigate('/');
   };
 
   const handleUpdateBalance = async () => {
     if (!newBalance || parseFloat(newBalance) === currentBalance) return;
     await reconcile({ balance: parseFloat(newBalance), matched: false });
+    toast('Balance updated!');
     navigate('/');
   };
 

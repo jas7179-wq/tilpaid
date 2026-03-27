@@ -106,9 +106,9 @@ export default function TransactionCard({ transaction, isScheduled = false }) {
       >
         {/* Icon */}
         <div
-          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium shrink-0"
+          className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
           style={{
-            backgroundColor: `${color}15`,
+            backgroundColor: `${color}12`,
             color: color,
             border: transaction.isAdjustment ? `1.5px dashed ${color}` : 'none',
           }}
