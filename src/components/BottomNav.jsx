@@ -23,10 +23,11 @@ export default function BottomNav() {
   );
 
   return (
-    <div className="sticky bottom-0 flex items-center justify-evenly py-3 pb-6 border-t border-border bg-surface-card/90 backdrop-blur-sm z-10">
+    <div className="sticky bottom-0 flex items-center justify-evenly py-3 border-t border-border bg-surface-card/90 backdrop-blur-sm z-10"
+      style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
       <NavItem path="/" icon={List} label="Ledger" />
       <NavItem path="/add" icon={PlusCircle} label="Add" />
-      <NavItem path="/upcoming" icon={CalendarClock} label="Upcoming" />
+      <NavItem path="/recurring" icon={CalendarClock} label="Recurring" />
       <NavItem path="/settings" icon={Settings} label="Settings" />
     </div>
   );

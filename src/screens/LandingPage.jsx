@@ -57,7 +57,7 @@ function PhoneMockup() {
               {[
                 { icon: List, label: 'Ledger', active: true },
                 { icon: Plus, label: 'Add', active: false },
-                { icon: Clock, label: 'Upcoming', active: false },
+                { icon: Clock, label: 'Recurring', active: false },
               ].map((item, i) => (
                 <div key={i} className="flex flex-col items-center gap-0.5">
                   <item.icon size={10} className={item.active ? 'text-brand-500' : 'text-text-muted'} />

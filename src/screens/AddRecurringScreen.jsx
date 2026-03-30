@@ -65,13 +65,13 @@ export default function AddRecurringScreen() {
 
     await db.saveRecurringTransaction(recurring);
     toast('Recurring item saved!');
-    navigate('/upcoming');
+    navigate('/recurring');
   };
 
   return (
     <div className="min-h-screen bg-surface px-5 py-5 overflow-x-hidden">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={() => navigate('/upcoming')} className="flex items-center gap-1 text-brand-500 text-sm font-medium">
+        <button onClick={() => navigate('/recurring')} className="flex items-center gap-1 text-brand-500 text-sm font-medium">
           <ChevronLeft size={18} /> Back
         </button>
         <p className="text-base font-semibold">

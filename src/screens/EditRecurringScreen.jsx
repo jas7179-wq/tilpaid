@@ -37,7 +37,7 @@ export default function EditRecurringScreen() {
   useEffect(() => {
     async function load() {
       const r = await db.getRecurringTransaction(id);
-      if (!r) { navigate('/upcoming'); return; }
+      if (!r) { navigate('/recurring'); return; }
 
       setRecurring(r);
       setType(r.type || 'expense');
@@ -90,14 +90,14 @@ export default function EditRecurringScreen() {
 
     await db.saveRecurringTransaction(updated);
     toast('Changes saved!');
-    navigate('/upcoming');
+    navigate('/recurring');
   };
 
   const handleDelete = async () => {
     if (confirm(`Delete recurring "${description}"? This cannot be undone.`)) {
       await db.deleteRecurringTransaction(id);
       toast('Recurring item deleted');
-      navigate('/upcoming');
+      navigate('/recurring');
     }
   };
 
@@ -112,7 +112,7 @@ export default function EditRecurringScreen() {
   return (
     <div className="min-h-screen bg-surface px-5 py-5 overflow-x-hidden">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={() => navigate('/upcoming')} className="flex items-center gap-1 text-brand-500 text-sm font-medium">
+        <button onClick={() => navigate('/recurring')} className="flex items-center gap-1 text-brand-500 text-sm font-medium">
           <ChevronLeft size={18} /> Back
         </button>
         <p className="text-base font-semibold">Edit recurring</p>

@@ -59,10 +59,9 @@ export default function SettingsScreen() {
 
   // Per-account editing state
   const [editingAccountId, setEditingAccountId] = useState(null);
-  const [localPayFreq, setLocalPayFreq] = useState('');
-  const [localNextPay, setLocalNextPay] = useState('');
   const [localAccountType, setLocalAccountType] = useState('');
   const [localAccountName, setLocalAccountName] = useState('');
+  const [localPayCycles, setLocalPayCycles] = useState([]);
 
   // Reset state
   const [showReset, setShowReset] = useState(false);
@@ -216,20 +215,25 @@ export default function SettingsScreen() {
     const account = accounts.find(a => a.id === editingAccountId);
     if (!account) return;
 
+    // Derive legacy fields from cycles for backward compat
+    const validCycles = localPayCycles.filter(c => c.frequency && c.nextPayDate);
+    const nearest = validCycles.sort((a, b) => a.nextPayDate.localeCompare(b.nextPayDate))[0];
+
     const updated = {
       ...account,
       name: localAccountName.trim() || account.name,
       type: localAccountType,
-      payFrequency: localPayFreq || null,
-      nextPayDate: localNextPay || null,
+      payCycles: validCycles,
+      payFrequency: nearest?.frequency || null,
+      nextPayDate: nearest?.nextPayDate || null,
       updatedAt: Date.now(),
     };
     await db.saveAccount(updated);
 
     // Update global settings if this is the active account
     if (editingAccountId === activeAccount?.id) {
-      if (localPayFreq) await db.saveSetting('payFrequency', localPayFreq);
-      if (localNextPay) await db.saveSetting('nextPayDate', localNextPay);
+      if (nearest?.frequency) await db.saveSetting('payFrequency', nearest.frequency);
+      if (nearest?.nextPayDate) await db.saveSetting('nextPayDate', nearest.nextPayDate);
     }
 
     setEditingAccountId(null);
@@ -240,8 +244,38 @@ export default function SettingsScreen() {
     setEditingAccountId(account.id);
     setLocalAccountName(account.name || '');
     setLocalAccountType(account.type || 'checking');
-    setLocalPayFreq(account.payFrequency || '');
-    setLocalNextPay(account.nextPayDate || '');
+    // Migrate: build payCycles from legacy if needed
+    if (account.payCycles && account.payCycles.length > 0) {
+      setLocalPayCycles([...account.payCycles]);
+    } else if (account.payFrequency) {
+      setLocalPayCycles([{
+        id: Math.random().toString(36).slice(2, 10),
+        name: '',
+        frequency: account.payFrequency,
+        nextPayDate: account.nextPayDate || '',
+      }]);
+    } else {
+      setLocalPayCycles([]);
+    }
+  };
+
+  const addPayCycle = () => {
+    setLocalPayCycles(prev => [...prev, {
+      id: Math.random().toString(36).slice(2, 10),
+      name: '',
+      frequency: '',
+      nextPayDate: '',
+    }]);
+  };
+
+  const updatePayCycle = (cycleId, field, value) => {
+    setLocalPayCycles(prev => prev.map(c =>
+      c.id === cycleId ? { ...c, [field]: value } : c
+    ));
+  };
+
+  const removePayCycle = (cycleId) => {
+    setLocalPayCycles(prev => prev.filter(c => c.id !== cycleId));
   };
 
   return (
@@ -394,34 +428,61 @@ export default function SettingsScreen() {
                     </div>
                   </div>
 
-                  {/* Pay frequency */}
+                  {/* Pay cycles */}
                   <div className="mb-3">
-                    <label className="text-[11px] text-text-muted block mb-1">Pay frequency</label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {PAY_FREQUENCIES.map((pf) => (
-                        <button key={pf.value}
-                          onClick={() => setLocalPayFreq(localPayFreq === pf.value ? '' : pf.value)}
-                          className={`py-2 px-2 rounded-lg text-xs font-medium transition-colors ${
-                            localPayFreq === pf.value
-                              ? 'bg-brand-50 border-[1.5px] border-brand-500 text-brand-700'
-                              : 'border border-border text-text-secondary'
-                          }`}>{pf.label}</button>
-                      ))}
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-[11px] text-text-muted block">Pay cycles</label>
+                      <button onClick={addPayCycle}
+                        className="text-[10px] text-brand-500 font-medium">+ Add cycle</button>
                     </div>
-                  </div>
 
-                  {/* Next payday */}
-                  {localPayFreq && (
-                    <div>
-                      <label className="text-[11px] text-text-muted block mb-1">Next payday</label>
-                      <input type="date" value={localNextPay}
-                        onChange={(e) => setLocalNextPay(e.target.value)}
-                        onFocus={(e) => { try { e.target.showPicker(); } catch {} }}
-                        onClick={(e) => { try { e.target.showPicker(); } catch {} }}
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:border-brand-500 box-border appearance-none"
-                        style={{ maxWidth: '100%' }} />
-                    </div>
-                  )}
+                    {localPayCycles.length === 0 && (
+                      <p className="text-[11px] text-text-muted py-2">No pay cycles set. Tap "Add cycle" to track a payday.</p>
+                    )}
+
+                    {localPayCycles.map((cycle, idx) => (
+                      <div key={cycle.id} className="bg-surface rounded-[10px] border border-border-light p-3 mb-2">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-[10px] text-text-muted uppercase tracking-wider">
+                            Cycle {idx + 1}
+                          </span>
+                          <button onClick={() => removePayCycle(cycle.id)}
+                            className="text-[10px] text-danger-500 font-medium">Remove</button>
+                        </div>
+
+                        {/* Cycle name (optional) */}
+                        <div className="mb-2">
+                          <input type="text" placeholder="Name (e.g. Jason, Sarah)"
+                            value={cycle.name}
+                            onChange={(e) => updatePayCycle(cycle.id, 'name', e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border" />
+                        </div>
+
+                        {/* Frequency */}
+                        <div className="grid grid-cols-2 gap-1 mb-2">
+                          {PAY_FREQUENCIES.map((pf) => (
+                            <button key={pf.value}
+                              onClick={() => updatePayCycle(cycle.id, 'frequency', cycle.frequency === pf.value ? '' : pf.value)}
+                              className={`py-1.5 px-2 rounded-lg text-[10px] font-medium transition-colors ${
+                                cycle.frequency === pf.value
+                                  ? 'bg-brand-50 border-[1.5px] border-brand-500 text-brand-700'
+                                  : 'border border-border text-text-secondary'
+                              }`}>{pf.label}</button>
+                          ))}
+                        </div>
+
+                        {/* Next payday */}
+                        {cycle.frequency && (
+                          <input type="date" value={cycle.nextPayDate}
+                            onChange={(e) => updatePayCycle(cycle.id, 'nextPayDate', e.target.value)}
+                            onFocus={(e) => { try { e.target.showPicker(); } catch {} }}
+                            onClick={(e) => { try { e.target.showPicker(); } catch {} }}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border appearance-none"
+                            style={{ maxWidth: '100%' }} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 /* ── Display mode ── */
@@ -441,18 +502,38 @@ export default function SettingsScreen() {
                     </div>
                   </div>
 
-                  {/* Pay info */}
-                  {(account.payFrequency || account.nextPayDate) && (
-                    <div className="flex gap-4 mt-2 pt-2 border-t border-border-light">
-                      {account.payFrequency && (
-                        <p className="text-[11px] text-text-muted">
-                          Pay: <span className="text-text-secondary capitalize">{PAY_FREQUENCIES.find(p => p.value === account.payFrequency)?.label || account.payFrequency}</span>
-                        </p>
-                      )}
-                      {account.nextPayDate && (
-                        <p className="text-[11px] text-text-muted">
-                          Next: <span className="text-text-secondary">{account.nextPayDate}</span>
-                        </p>
+                  {/* Pay cycles info */}
+                  {((account.payCycles && account.payCycles.length > 0) || account.payFrequency) && (
+                    <div className="mt-2 pt-2 border-t border-border-light">
+                      {account.payCycles && account.payCycles.length > 0 ? (
+                        account.payCycles.map((cycle) => (
+                          <div key={cycle.id} className="flex gap-4 items-center mb-1 last:mb-0">
+                            {cycle.name && (
+                              <p className="text-[11px] text-text-secondary font-medium min-w-[50px]">{cycle.name}</p>
+                            )}
+                            <p className="text-[11px] text-text-muted">
+                              {PAY_FREQUENCIES.find(p => p.value === cycle.frequency)?.label || cycle.frequency}
+                            </p>
+                            {cycle.nextPayDate && (
+                              <p className="text-[11px] text-text-muted">
+                                Next: <span className="text-text-secondary">{cycle.nextPayDate}</span>
+                              </p>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex gap-4">
+                          {account.payFrequency && (
+                            <p className="text-[11px] text-text-muted">
+                              Pay: <span className="text-text-secondary capitalize">{PAY_FREQUENCIES.find(p => p.value === account.payFrequency)?.label || account.payFrequency}</span>
+                            </p>
+                          )}
+                          {account.nextPayDate && (
+                            <p className="text-[11px] text-text-muted">
+                              Next: <span className="text-text-secondary">{account.nextPayDate}</span>
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}

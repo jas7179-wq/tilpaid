@@ -158,18 +158,93 @@ export function createTransaction({
 }
 
 export function createAccount({ name, type, balance, payFrequency, nextPayDate }) {
+  // Build payCycles array from legacy single pay settings
+  const payCycles = [];
+  if (payFrequency && nextPayDate) {
+    payCycles.push({
+      id: generateId().slice(0, 8),
+      name: '',
+      frequency: payFrequency,
+      nextPayDate,
+    });
+  }
+
   return {
     id: generateId(),
     name,
     type,
     startingBalance: balance,
     currentBalance: balance,
-    payFrequency: payFrequency || null,
-    nextPayDate: nextPayDate || null,
+    payFrequency: payFrequency || null, // keep for backward compat
+    nextPayDate: nextPayDate || null,   // keep for backward compat
+    payCycles,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     lastReconciledAt: null,
   };
+}
+
+// Advance a single pay cycle date past today
+export function advancePayCycleDate(nextPayDate, frequency) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let payDateObj = new Date(nextPayDate + 'T00:00:00');
+  let advanced = false;
+
+  while (payDateObj < today) {
+    advanced = true;
+    switch (frequency) {
+      case 'weekly':
+        payDateObj.setDate(payDateObj.getDate() + 7);
+        break;
+      case 'biweekly':
+        payDateObj.setDate(payDateObj.getDate() + 14);
+        break;
+      case 'semi-monthly': {
+        const d = payDateObj.getDate();
+        if (d < 15) {
+          payDateObj.setDate(15);
+        } else {
+          payDateObj.setMonth(payDateObj.getMonth() + 1);
+          payDateObj.setDate(1);
+        }
+        break;
+      }
+      case 'monthly':
+        payDateObj.setMonth(payDateObj.getMonth() + 1);
+        break;
+      default:
+        payDateObj.setDate(payDateObj.getDate() + 14);
+    }
+  }
+
+  return {
+    date: payDateObj.toISOString().split('T')[0],
+    advanced,
+  };
+}
+
+// Get the nearest next pay date from an account's pay cycles
+// Returns { date, cycleName } or null
+export function getNextPayInfo(account) {
+  const cycles = account.payCycles || [];
+
+  // If no payCycles, fall back to legacy single fields
+  if (cycles.length === 0) {
+    if (account.nextPayDate) {
+      return { date: account.nextPayDate, cycleName: '' };
+    }
+    return null;
+  }
+
+  let nearest = null;
+  for (const cycle of cycles) {
+    if (!cycle.nextPayDate) continue;
+    if (!nearest || cycle.nextPayDate < nearest.date) {
+      nearest = { date: cycle.nextPayDate, cycleName: cycle.name || '' };
+    }
+  }
+  return nearest;
 }
 
 export function createReconciliation({ accountId, balance, matched }) {

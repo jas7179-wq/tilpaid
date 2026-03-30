@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useReducer, useCallback } from 'r
 import * as db from '../lib/db';
 import * as sync from '../lib/sync';
 import * as api from '../lib/api';
-import { computeRunningBalances, computeCurrentBalance, createTransaction, createAccount, createReconciliation } from '../lib/utils';
+import { computeRunningBalances, computeCurrentBalance, createTransaction, createAccount, createReconciliation, advancePayCycleDate, getNextPayInfo } from '../lib/utils';
 
 const AppContext = createContext(null);
 
@@ -74,48 +74,56 @@ export function AppProvider({ children }) {
       today.setHours(0, 0, 0, 0);
 
       for (const account of accounts) {
+        let accountChanged = false;
+
         // Migrate: if account has no pay settings, pull from global
         if (!account.payFrequency && globalPayFrequency) {
           account.payFrequency = globalPayFrequency;
           account.nextPayDate = globalNextPayDate;
         }
 
-        if (account.nextPayDate && account.payFrequency) {
-          let payDateObj = new Date(account.nextPayDate + 'T00:00:00');
-          let advanced = false;
+        // Migrate: if account has legacy single pay fields but no payCycles, create one
+        if ((!account.payCycles || account.payCycles.length === 0) && account.payFrequency && account.nextPayDate) {
+          account.payCycles = [{
+            id: Math.random().toString(36).slice(2, 10),
+            name: '',
+            frequency: account.payFrequency,
+            nextPayDate: account.nextPayDate,
+          }];
+          accountChanged = true;
+        }
 
-          while (payDateObj < today) {
-            advanced = true;
-            switch (account.payFrequency) {
-              case 'weekly':
-                payDateObj.setDate(payDateObj.getDate() + 7);
-                break;
-              case 'biweekly':
-                payDateObj.setDate(payDateObj.getDate() + 14);
-                break;
-              case 'semi-monthly': {
-                const d = payDateObj.getDate();
-                if (d < 15) {
-                  payDateObj.setDate(15);
-                } else {
-                  payDateObj.setMonth(payDateObj.getMonth() + 1);
-                  payDateObj.setDate(1);
-                }
-                break;
+        // Auto-advance each pay cycle
+        if (account.payCycles && account.payCycles.length > 0) {
+          for (const cycle of account.payCycles) {
+            if (cycle.nextPayDate && cycle.frequency) {
+              const result = advancePayCycleDate(cycle.nextPayDate, cycle.frequency);
+              if (result.advanced) {
+                cycle.nextPayDate = result.date;
+                accountChanged = true;
               }
-              case 'monthly':
-                payDateObj.setMonth(payDateObj.getMonth() + 1);
-                break;
-              default:
-                payDateObj.setDate(payDateObj.getDate() + 14);
             }
           }
-
-          if (advanced) {
-            account.nextPayDate = payDateObj.toISOString().split('T')[0];
-            account.updatedAt = Date.now();
-            await db.saveAccount(account);
+          // Keep legacy fields in sync with the earliest cycle
+          const nearest = account.payCycles
+            .filter(c => c.nextPayDate)
+            .sort((a, b) => a.nextPayDate.localeCompare(b.nextPayDate))[0];
+          if (nearest) {
+            account.payFrequency = nearest.frequency;
+            account.nextPayDate = nearest.nextPayDate;
           }
+        } else if (account.nextPayDate && account.payFrequency) {
+          // Fallback for accounts without payCycles
+          const result = advancePayCycleDate(account.nextPayDate, account.payFrequency);
+          if (result.advanced) {
+            account.nextPayDate = result.date;
+            accountChanged = true;
+          }
+        }
+
+        if (accountChanged) {
+          account.updatedAt = Date.now();
+          await db.saveAccount(account);
         }
       }
 

@@ -36,22 +36,50 @@ export default function UpcomingScreen() {
       allRecurring = [...allRecurring, ...recurring];
     }
     setRecurringList(allRecurring);
-    rebuildUpcoming(allRecurring, filterAccountId);
+    await rebuildUpcoming(allRecurring, filterAccountId);
   }
 
-  const rebuildUpcoming = (recurring, accountFilter) => {
+  const rebuildUpcoming = async (recurring, accountFilter) => {
     const filtered = accountFilter === 'all'
       ? recurring.filter(r => r.isActive)
       : recurring.filter(r => r.isActive && r.accountId === accountFilter);
 
     const allUpcoming = filtered.flatMap(r => generateUpcomingOccurrences(r, 65));
-    allUpcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
-    setUpcomingItems(allUpcoming);
+
+    // Load all transactions to dedup against posted items
+    const allTransactions = [];
+    for (const acc of accounts) {
+      const txs = await db.getTransactions(acc.id);
+      allTransactions.push(...txs);
+    }
+
+    const today = todayISO();
+
+    // Filter out occurrences that have already been posted
+    const deduped = allUpcoming.filter(item => {
+      const hasMatch = allTransactions.some(tx => {
+        if (tx.isAdjustment) return false;
+        // Exact match: tagged with same recurringId and occurrence date
+        if (tx.recurringId === item.recurringId && tx.recurringOccurrenceDate === item.date) {
+          return true;
+        }
+        // Fallback: match by description within 7 days
+        if (tx.description?.toLowerCase() !== item.description?.toLowerCase()) return false;
+        const txDate = new Date(tx.date);
+        const itemDate = new Date(item.date);
+        const daysDiff = Math.abs((txDate - itemDate) / (1000 * 60 * 60 * 24));
+        return daysDiff <= 7;
+      });
+      return !hasMatch;
+    });
+
+    deduped.sort((a, b) => new Date(a.date) - new Date(b.date));
+    setUpcomingItems(deduped);
   };
 
-  const handleFilterChange = (accountId) => {
+  const handleFilterChange = async (accountId) => {
     setFilterAccountId(accountId);
-    rebuildUpcoming(recurringList, accountId);
+    await rebuildUpcoming(recurringList, accountId);
   };
 
   const getCat = (catId) => categories.find(c => c.id === catId);
@@ -62,7 +90,7 @@ export default function UpcomingScreen() {
     await db.deleteRecurringTransaction(id);
     const updated = recurringList.filter(r => r.id !== id);
     setRecurringList(updated);
-    rebuildUpcoming(updated, filterAccountId);
+    await rebuildUpcoming(updated, filterAccountId);
   };
 
   // Open verify modal
@@ -88,6 +116,9 @@ export default function UpcomingScreen() {
       date: verifyItem.date,
       type: verifyItem.type,
     });
+    // Tag with recurringId and occurrence date for precise dedup
+    tx.recurringId = verifyItem.recurringId;
+    tx.recurringOccurrenceDate = verifyItem.date;
 
     await db.saveTransaction(tx);
 
@@ -99,18 +130,6 @@ export default function UpcomingScreen() {
       account.currentBalance = Math.round((account.startingBalance + totalTxs) * 100) / 100;
       account.updatedAt = Date.now();
       await db.saveAccount(account);
-    }
-
-    // Advance the recurring start date past today so it doesn't regenerate this occurrence
-    const recurring = await db.getRecurringTransaction(verifyItem.recurringId);
-    if (recurring) {
-      // Move startDate forward to day after the verified date
-      const verifiedDate = new Date(verifyItem.date);
-      verifiedDate.setDate(verifiedDate.getDate() + 1);
-      const newStart = verifiedDate.toISOString().split('T')[0];
-      recurring.startDate = newStart;
-      recurring.updatedAt = Date.now();
-      await db.saveRecurringTransaction(recurring);
     }
 
     setVerifyItem(null);
@@ -157,7 +176,7 @@ export default function UpcomingScreen() {
     return (
       <div className="min-h-screen bg-surface flex flex-col">
         <div className="flex-1 px-5 py-5">
-          <h1 className="text-2xl font-semibold mb-2">Coming up</h1>
+          <h1 className="text-2xl font-semibold mb-2">Recurring</h1>
           <p className="text-sm text-text-secondary mb-8">See what's ahead between paychecks</p>
           <div className="bg-gradient-to-br from-brand-50 to-success-50 rounded-[14px] border border-brand-100 p-6 text-center">
             <Calendar size={32} className="text-brand-500 mx-auto mb-3" />
@@ -181,7 +200,7 @@ export default function UpcomingScreen() {
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-2xl font-semibold">Coming up</h1>
+            <h1 className="text-2xl font-semibold">Recurring</h1>
             {needsVerifyCount > 0 && (
               <p className="text-xs text-warning-600 font-medium mt-0.5">
                 {needsVerifyCount} item{needsVerifyCount > 1 ? 's' : ''} to verify
@@ -259,7 +278,7 @@ export default function UpcomingScreen() {
             {upcomingItems.length === 0 ? (
               <div className="text-center py-12">
                 <Repeat size={24} className="text-text-muted mx-auto mb-2" />
-                <p className="text-sm text-text-muted">No upcoming bills or deposits</p>
+                <p className="text-sm text-text-muted">No recurring bills or deposits</p>
                 <button onClick={() => navigate('/add-recurring')} className="mt-3 text-sm text-brand-500 font-medium">
                   Add your first one
                 </button>

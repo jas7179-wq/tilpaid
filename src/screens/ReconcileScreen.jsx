@@ -30,7 +30,7 @@ export default function ReconcileScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-surface px-5 py-5">
+    <div className="min-h-screen bg-surface px-5 py-5 overflow-x-hidden">
       {/* Header */}
       <div className="flex justify-between items-center mb-7">
         <button onClick={() => navigate('/')} className="flex items-center gap-1 text-brand-500 text-sm">
@@ -75,7 +75,7 @@ export default function ReconcileScreen() {
           placeholder={formatCurrency(currentBalance)}
           value={newBalance}
           onChange={(e) => setNewBalance(e.target.value)}
-          className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+          className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"
         />
       </div>
 

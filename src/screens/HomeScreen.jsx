@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, generateUpcomingOccurrences, todayISO, daysUntil, createTransaction } from '../lib/utils';
+import { formatCurrency, generateUpcomingOccurrences, todayISO, daysUntil, createTransaction, getNextPayInfo } from '../lib/utils';
 import * as db from '../lib/db';
 import TransactionCard from '../components/TransactionCard';
 import StartingBalanceLine from '../components/StartingBalanceLine';
@@ -25,6 +25,7 @@ export default function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [warningThreshold, setWarningThreshold] = useState(250);
   const [actionItem, setActionItem] = useState(null); // for recurring action sheet
+  const [postEarlyAmount, setPostEarlyAmount] = useState('');
 
   useEffect(() => {
     refreshTransactions();
@@ -54,15 +55,23 @@ export default function HomeScreen() {
     return Math.round((currentBalance - scheduledLedgerTotal) * 100) / 100;
   }, [currentBalance, scheduledLedgerTotal]);
 
-  // Dynamic payday from scheduled paycheck
-  const effectivePayDate = useMemo(() => {
+  // Dynamic payday from scheduled paycheck or pay cycles
+  const effectivePayInfo = useMemo(() => {
     const manualPaycheck = manualScheduled.find(tx => tx.categoryId === 'cat-paycheck');
-    if (manualPaycheck) return manualPaycheck.date;
+    if (manualPaycheck) return { date: manualPaycheck.date, name: '' };
     const recurringPaycheck = recurringScheduled.find(item => item.categoryId === 'cat-paycheck');
-    if (recurringPaycheck) return recurringPaycheck.date;
-    return payDate;
-  }, [manualScheduled, recurringScheduled, payDate]);
+    if (recurringPaycheck) return { date: recurringPaycheck.date, name: '' };
+    // Use pay cycles from account
+    if (activeAccount) {
+      const info = getNextPayInfo(activeAccount);
+      if (info) return info;
+    }
+    if (payDate) return { date: payDate, name: '' };
+    return null;
+  }, [manualScheduled, recurringScheduled, payDate, activeAccount]);
 
+  const effectivePayDate = effectivePayInfo?.date || null;
+  const effectivePayCycleName = effectivePayInfo?.cycleName || '';
   const daysTilPay = effectivePayDate ? daysUntil(effectivePayDate) : null;
 
   // Load recurring → auto-populate
@@ -78,19 +87,17 @@ export default function HomeScreen() {
         .flatMap(r => generateUpcomingOccurrences(r, lookAhead));
       allUpcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-      // De-duplicate: skip recurring items that already have a matching manual entry
-      const allManualDescs = new Set(
-        transactionsWithBalances
-          .filter(tx => !tx.isAdjustment)
-          .map(tx => tx.description?.toLowerCase())
-          .filter(Boolean)
-      );
-
+      // De-duplicate: skip recurring items that already have a posted transaction
       const autoScheduled = allUpcoming
         .filter(item => {
           if (item.date <= today) return false;
           const hasMatch = transactionsWithBalances.some(tx => {
             if (tx.isAdjustment) return false;
+            // Exact match: tagged with same recurringId and occurrence date
+            if (tx.recurringId === item.recurringId && tx.recurringOccurrenceDate === item.date) {
+              return true;
+            }
+            // Fallback: match by description within 7 days (for manually entered items)
             if (tx.description?.toLowerCase() !== item.description?.toLowerCase()) return false;
             const txDate = new Date(tx.date);
             const itemDate = new Date(item.date);
@@ -101,21 +108,33 @@ export default function HomeScreen() {
         })
         .map(item => ({ ...item, isRecurringAuto: true }));
 
-      setRecurringScheduled(autoScheduled);
+      // Only show the next occurrence per recurring item (prevents posting multiple cycles)
+      const seen = new Set();
+      const nextOnly = autoScheduled.filter(item => {
+        if (seen.has(item.recurringId)) return false;
+        seen.add(item.recurringId);
+        return true;
+      });
+
+      setRecurringScheduled(nextOnly);
     }
     loadRecurringForScheduled();
   }, [activeAccountId, currentBalance, transactionsWithBalances, today, payDate]);
 
   // Post early handler
   const handlePostEarly = async (item) => {
+    const customAmount = postEarlyAmount ? parseFloat(postEarlyAmount) : Math.abs(item.amount);
     const tx = createTransaction({
       accountId: item.accountId,
-      amount: Math.abs(item.amount),
+      amount: customAmount,
       description: item.description,
       categoryId: item.categoryId,
       date: todayISO(),
       type: item.type,
     });
+    // Tag with recurringId and the occurrence date so dedup can match precisely
+    tx.recurringId = item.recurringId;
+    tx.recurringOccurrenceDate = item.date;
     await db.saveTransaction(tx);
 
     // Sync account balance
@@ -128,17 +147,8 @@ export default function HomeScreen() {
       await db.saveAccount(account);
     }
 
-    // Advance recurring start date past today
-    const recurring = await db.getRecurringTransaction(item.recurringId);
-    if (recurring) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      recurring.startDate = tomorrow.toISOString().split('T')[0];
-      recurring.updatedAt = Date.now();
-      await db.saveRecurringTransaction(recurring);
-    }
-
     setActionItem(null);
+    setPostEarlyAmount('');
     await refreshTransactions();
   };
 
@@ -215,13 +225,13 @@ export default function HomeScreen() {
             {daysTilPay !== null && daysTilPay > 0 && (
               <>
                 <span className="text-text-muted text-[11px]">·</span>
-                <span className="text-[11px] text-brand-500 font-semibold">{daysTilPay}d til pay</span>
+                <span className="text-[11px] text-brand-500 font-semibold">{daysTilPay}d til pay{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}</span>
               </>
             )}
             {daysTilPay === 0 && (
               <>
                 <span className="text-text-muted text-[11px]">·</span>
-                <span className="text-[11px] text-success-500 font-semibold">Payday!</span>
+                <span className="text-[11px] text-success-500 font-semibold">Payday!{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}</span>
               </>
             )}
           </div>
@@ -304,7 +314,7 @@ export default function HomeScreen() {
                   if (item.isRecurringAuto) {
                     return (
                       <div key={item.id}
-                        onClick={() => setActionItem(item)}
+                        onClick={() => { setActionItem(item); setPostEarlyAmount(Math.abs(item.amount).toFixed(2)); }}
                         className="flex items-center gap-3 py-3 px-1 border-b border-dashed border-border-light bg-brand-50/20 cursor-pointer select-none"
                       >
                         <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
@@ -358,17 +368,40 @@ export default function HomeScreen() {
 
       {/* Recurring action sheet */}
       {actionItem && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center overlay-enter" onClick={() => setActionItem(null)}>
-          <div className="bg-surface-card w-full max-w-md rounded-t-2xl px-5 pt-5 pb-8 sheet-enter" onClick={e => e.stopPropagation()}>
-            <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-5 overlay-enter" onClick={() => { setActionItem(null); setPostEarlyAmount(''); }}>
+          <div className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-4 shadow-xl sheet-enter" onClick={e => e.stopPropagation()}>
             <p className="text-base font-semibold mb-1">{actionItem.description}</p>
-            <p className="text-xs text-text-muted mb-5">
+            <p className="text-xs text-text-muted mb-3">
               {actionItem.type === 'income' ? 'Deposit' : 'Bill'} · Scheduled {actionItem.date} · {formatCurrency(actionItem.amount)}
             </p>
 
+            {/* Editable amount */}
+            <div className="mb-3">
+              <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1">
+                {actionItem.isApproximate ? 'Adjust amount' : 'Amount'}
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-text-muted">{actionItem.type === 'expense' ? '-$' : '+$'}</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={postEarlyAmount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) setPostEarlyAmount(val);
+                  }}
+                  className="flex-1 px-3 py-2 rounded-[10px] border border-border bg-surface text-sm font-medium focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"
+                />
+              </div>
+              {actionItem.isApproximate && (
+                <p className="text-[10px] text-text-muted mt-1">This was an estimate — enter the actual amount</p>
+              )}
+            </div>
+
             <button
               onClick={() => handlePostEarly(actionItem)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-[10px] bg-success-50 border border-success-200 mb-2 active:scale-[0.98] transition-transform"
+              disabled={!postEarlyAmount || parseFloat(postEarlyAmount) === 0}
+              className="w-full flex items-center gap-3 px-4 py-3.5 rounded-[10px] bg-success-50 border border-success-200 mb-2 disabled:opacity-40"
             >
               <Zap size={18} className="text-success-600 shrink-0" />
               <div className="text-left">
@@ -379,12 +412,12 @@ export default function HomeScreen() {
               </div>
             </button>
 
-            <p className="text-[10px] text-text-muted text-center mb-3 px-2">
-              To edit this recurring item, go to Upcoming → Manage
+            <p className="text-[10px] text-text-muted text-center mb-2 px-2">
+              To edit this recurring item, go to Recurring → Manage
             </p>
 
-            <button onClick={() => setActionItem(null)}
-              className="w-full py-3 text-center text-sm text-text-muted font-medium">
+            <button onClick={() => { setActionItem(null); setPostEarlyAmount(''); }}
+              className="w-full py-2.5 text-center text-sm text-text-muted font-medium">
               Cancel
             </button>
           </div>

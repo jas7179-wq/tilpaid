@@ -67,7 +67,7 @@ export default function SetupScreen() {
   }
 
   return (
-    <div className="min-h-screen px-6 py-8">
+    <div className="min-h-screen px-6 py-8 overflow-x-hidden">
       <h1 className="text-2xl font-semibold mb-1">Let's get you set up</h1>
       <p className="text-sm text-text-secondary mb-8">This takes about 30 seconds</p>
 
@@ -112,7 +112,7 @@ export default function SetupScreen() {
           placeholder="0.00"
           value={balance}
           onChange={(e) => setBalance(e.target.value)}
-          className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-lg focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+          className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-lg focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"
         />
         <p className="text-xs text-text-muted mt-1.5">Check your bank app for the exact amount</p>
       </div>
@@ -148,7 +148,7 @@ export default function SetupScreen() {
           type="date"
           value={nextPayDate}
           onChange={(e) => setNextPayDate(e.target.value)}
-          className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+          className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"
         />
       </div>
 

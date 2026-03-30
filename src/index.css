@@ -54,6 +54,11 @@
   button:disabled {
     cursor: not-allowed;
   }
+
+  input, select, textarea {
+    box-sizing: border-box;
+    max-width: 100%;
+  }
 }
 
 /* Screen transitions */
