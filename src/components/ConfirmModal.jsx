@@ -29,8 +29,8 @@ export default function ConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center px-6 pt-[20vh] overlay-enter" onClick={handleClose}>
-      <div className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-5 shadow-xl sheet-enter" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center px-6 pt-[10vh] pb-4 overflow-y-auto overlay-enter" onClick={handleClose}>
+      <div className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-5 shadow-xl sheet-enter my-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 mb-3">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
             danger ? 'bg-danger-50' : 'bg-warning-50'
@@ -56,7 +56,6 @@ export default function ConfirmModal({
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder={confirmWord}
-              autoFocus
               className="w-full px-3 py-2.5 rounded-[10px] border border-border bg-surface text-sm focus:outline-none focus:border-danger-500 focus:ring-1 focus:ring-danger-500 box-border"
             />
           </div>
