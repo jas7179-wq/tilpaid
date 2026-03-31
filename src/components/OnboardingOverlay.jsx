@@ -68,8 +68,8 @@ export default function OnboardingOverlay() {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center overlay-enter">
-      <div className="bg-surface-card w-full max-w-md rounded-t-2xl px-6 pt-6 pb-8 sheet-enter">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-5 overlay-enter">
+      <div className="bg-surface-card w-full max-w-sm rounded-2xl px-6 pt-6 pb-6 shadow-xl sheet-enter">
         {/* Skip */}
         <div className="flex justify-end mb-2">
           <button onClick={handleDismiss} className="text-xs text-text-muted flex items-center gap-1">
@@ -97,7 +97,7 @@ export default function OnboardingOverlay() {
 
         {/* Next button */}
         <button onClick={handleNext}
-          className="w-full py-3 rounded-[10px] bg-brand-500 text-white text-sm font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+          className="w-full py-3 rounded-[10px] bg-brand-500 text-white text-sm font-medium flex items-center justify-center gap-2">
           {isLast ? 'Get started' : 'Next'}
           {!isLast && <ChevronRight size={16} />}
         </button>

@@ -561,8 +561,8 @@ export default function UpcomingScreen() {
 
       {/* Verify modal */}
       {verifyItem && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center">
-          <div className="bg-surface-card w-full max-w-md rounded-t-2xl px-5 pt-5 pb-8 animate-slide-up">
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center px-5 pt-[15vh] overlay-enter" onClick={() => { setVerifyItem(null); setVerifyAmount(''); }}>
+          <div className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-5 shadow-xl sheet-enter" onClick={e => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-semibold">Verify & post to ledger</h3>
               <button onClick={() => { setVerifyItem(null); setVerifyAmount(''); }}
@@ -583,10 +583,13 @@ export default function UpcomingScreen() {
               <div className="flex items-center gap-2">
                 <span className="text-lg text-text-secondary">$</span>
                 <input
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={verifyAmount}
-                  onChange={(e) => setVerifyAmount(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) setVerifyAmount(val);
+                  }}
                   className="flex-1 px-4 py-3 rounded-[10px] border border-border bg-white text-lg font-medium focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"
                   autoFocus
                 />
@@ -599,7 +602,7 @@ export default function UpcomingScreen() {
             </div>
 
             <button onClick={handleVerifyConfirm}
-              className="w-full py-3.5 rounded-[10px] bg-success-500 text-white text-[15px] font-medium active:scale-[0.98] transition-transform">
+              className="w-full py-3.5 rounded-[10px] bg-success-500 text-white text-[15px] font-medium">
               Post {verifyItem.type === 'income' ? 'deposit' : 'payment'} to ledger
             </button>
           </div>

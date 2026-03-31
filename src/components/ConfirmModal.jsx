@@ -7,7 +7,7 @@ export default function ConfirmModal({
   onConfirm,
   title = 'Are you sure?',
   message = 'This action cannot be undone.',
-  confirmWord = null, // If set, user must type this word to confirm
+  confirmWord = null,
   confirmLabel = 'Confirm',
   danger = true,
 }) {
@@ -29,8 +29,8 @@ export default function ConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6 overlay-enter">
-      <div className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-5 shadow-xl sheet-enter">
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center px-6 pt-[20vh] overlay-enter" onClick={handleClose}>
+      <div className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-5 shadow-xl sheet-enter" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 mb-3">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
             danger ? 'bg-danger-50' : 'bg-warning-50'
