@@ -216,7 +216,9 @@ export default function SettingsScreen() {
     if (!account) return;
 
     // Derive legacy fields from cycles for backward compat
-    const validCycles = localPayCycles.filter(c => c.frequency && c.nextPayDate);
+    const validCycles = localPayCycles
+      .filter(c => c.frequency && c.nextPayDate)
+      .map(({ amountInput, ...rest }) => rest); // strip temp input field
     const nearest = validCycles.sort((a, b) => a.nextPayDate.localeCompare(b.nextPayDate))[0];
 
     const updated = {
@@ -480,6 +482,31 @@ export default function SettingsScreen() {
                             className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border appearance-none"
                             style={{ maxWidth: '100%' }} />
                         )}
+
+                        {/* Pay amount (Premium) */}
+                        {isPremium && cycle.frequency && (
+                          <div className="mt-2">
+                            <label className="text-[10px] text-text-muted block mb-0.5">Paycheck amount (optional)</label>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs text-text-muted">$</span>
+                              <input type="text" inputMode="decimal"
+                                placeholder="Auto-schedule paycheck"
+                                value={cycle.amountInput !== undefined ? cycle.amountInput : (cycle.amount || '')}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                                    updatePayCycle(cycle.id, 'amountInput', val);
+                                    updatePayCycle(cycle.id, 'amount', val ? parseFloat(val) || null : null);
+                                  }
+                                }}
+                                className="flex-1 px-2.5 py-1.5 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border" />
+                            </div>
+                            <p className="text-[9px] text-text-muted mt-0.5">Set to auto-add paycheck to scheduled items</p>
+                          </div>
+                        )}
+                        {!isPremium && cycle.frequency && (
+                          <p className="text-[9px] text-brand-500 mt-2">Premium: auto-schedule paychecks with amount</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -507,7 +534,7 @@ export default function SettingsScreen() {
                     <div className="mt-2 pt-2 border-t border-border-light">
                       {account.payCycles && account.payCycles.length > 0 ? (
                         account.payCycles.map((cycle) => (
-                          <div key={cycle.id} className="flex gap-4 items-center mb-1 last:mb-0">
+                          <div key={cycle.id} className="flex gap-3 items-center mb-1 last:mb-0 flex-wrap">
                             {cycle.name && (
                               <p className="text-[11px] text-text-secondary font-medium min-w-[50px]">{cycle.name}</p>
                             )}
@@ -517,6 +544,11 @@ export default function SettingsScreen() {
                             {cycle.nextPayDate && (
                               <p className="text-[11px] text-text-muted">
                                 Next: <span className="text-text-secondary">{cycle.nextPayDate}</span>
+                              </p>
+                            )}
+                            {cycle.amount && (
+                              <p className="text-[11px] text-success-600 font-medium">
+                                ${cycle.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                               </p>
                             )}
                           </div>

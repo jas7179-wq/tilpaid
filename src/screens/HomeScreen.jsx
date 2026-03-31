@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, generateUpcomingOccurrences, todayISO, daysUntil, createTransaction, getNextPayInfo } from '../lib/utils';
+import { formatCurrency, generateUpcomingOccurrences, todayISO, daysUntil, createTransaction, getNextPayInfo, generatePayCycleScheduledItems, advancePayCycleDate } from '../lib/utils';
 import * as db from '../lib/db';
 import TransactionCard from '../components/TransactionCard';
 import StartingBalanceLine from '../components/StartingBalanceLine';
@@ -143,6 +143,24 @@ export default function HomeScreen() {
     if (account) {
       const totalTxs = accTxs.reduce((sum, t) => sum + t.amount, 0);
       account.currentBalance = Math.round((account.startingBalance + totalTxs) * 100) / 100;
+
+      // If this is a pay cycle generated paycheck, advance the cycle's next pay date
+      if (item.isPayCycleGenerated && item.payCycleId && account.payCycles) {
+        const cycle = account.payCycles.find(c => c.id === item.payCycleId);
+        if (cycle) {
+          const result = advancePayCycleDate(todayISO(), cycle.frequency);
+          cycle.nextPayDate = result.date;
+          // Keep legacy fields in sync
+          const nearest = account.payCycles
+            .filter(c => c.nextPayDate)
+            .sort((a, b) => a.nextPayDate.localeCompare(b.nextPayDate))[0];
+          if (nearest) {
+            account.payFrequency = nearest.frequency;
+            account.nextPayDate = nearest.nextPayDate;
+          }
+        }
+      }
+
       account.updatedAt = Date.now();
       await db.saveAccount(account);
     }
@@ -168,10 +186,46 @@ export default function HomeScreen() {
       recurringItems = recurringScheduled.filter(item => item.date <= cutoffStr);
     }
 
-    const combined = [...manualItems, ...recurringItems];
-    combined.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Premium: auto-generate scheduled paychecks from pay cycles with amounts
+    let payCycleItems = [];
+    if (isPremium && activeAccount) {
+      payCycleItems = generatePayCycleScheduledItems(activeAccount);
+      // Dedup: skip pay cycle items if there's already a manual or recurring paycheck on the same date
+      payCycleItems = payCycleItems.filter(pcItem => {
+        const hasManual = manualItems.some(tx =>
+          tx.categoryId === 'cat-paycheck' && tx.date === pcItem.date
+        );
+        const hasRecurring = recurringItems.some(item =>
+          item.categoryId === 'cat-paycheck' && item.date === pcItem.date
+        );
+        return !hasManual && !hasRecurring;
+      });
+
+      // Only show the nearest paycheck, unless another is within 3 days of it
+      if (payCycleItems.length > 1) {
+        payCycleItems.sort((a, b) => a.date.localeCompare(b.date));
+        const nearest = payCycleItems[0];
+        const nearestDate = new Date(nearest.date);
+        payCycleItems = payCycleItems.filter(item => {
+          const daysDiff = Math.abs((new Date(item.date) - nearestDate) / (1000 * 60 * 60 * 24));
+          return daysDiff <= 3;
+        });
+      }
+    }
+
+    const combined = [...manualItems, ...recurringItems, ...payCycleItems];
+    // Sort by date descending, but on same day: expenses before income
+    combined.sort((a, b) => {
+      const dateCompare = new Date(b.date) - new Date(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      const aIsIncome = a.type === 'income' || (!a.type && a.amount > 0);
+      const bIsIncome = b.type === 'income' || (!b.type && b.amount > 0);
+      if (aIsIncome && !bIsIncome) return 1;
+      if (!aIsIncome && bIsIncome) return -1;
+      return 0;
+    });
     return combined;
-  }, [manualScheduled, recurringScheduled, effectivePayDate]);
+  }, [manualScheduled, recurringScheduled, effectivePayDate, isPremium, activeAccount]);
 
   // TilPaid balance: expenses only, before payday
   const scheduledExpensesTotal = useMemo(() => {
@@ -259,7 +313,7 @@ export default function HomeScreen() {
 
       {/* ── Ledger ── */}
       <div className="flex-1 px-4 pb-4">
-        {transactionsWithBalances.length === 0 && recurringScheduled.length === 0 ? (
+        {transactionsWithBalances.length === 0 && recurringScheduled.length === 0 && allScheduled.length === 0 ? (
           <div>
             <div className="text-center py-10 px-6">
               {/* Empty state illustration */}
@@ -327,6 +381,9 @@ export default function HomeScreen() {
                             Recurring · {item.date}
                             {item.isApproximate && ' · Est.'}
                           </p>
+                          {(item.type === 'income' || (!item.type && item.amount > 0)) && (
+                            <p className="text-[9px] text-text-muted mt-0.5 italic">Not counted in TilPaid balance</p>
+                          )}
                         </div>
                         <div className="text-right shrink-0">
                           <p className={`text-sm font-medium ${item.type === 'income' ? 'text-success-500' : ''}`}>

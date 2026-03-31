@@ -133,6 +133,9 @@ export default function TransactionCard({ transaction, isScheduled = false }) {
             {' · '}
             {formatDate(transaction.date)}
           </p>
+          {isScheduled && isPositive && (
+            <p className="text-[9px] text-text-muted mt-0.5 italic">Not counted in TilPaid balance</p>
+          )}
         </div>
 
         {/* Actions or Amount */}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, formatDate, daysUntil, generateUpcomingOccurrences, todayISO, createTransaction } from '../lib/utils';
+import { formatCurrency, formatDate, daysUntil, generateUpcomingOccurrences, todayISO, createTransaction, generatePayCycleScheduledItems, advancePayCycleDate } from '../lib/utils';
 import * as db from '../lib/db';
 import BottomNav from '../components/BottomNav';
 import { Plus, Trash2, Calendar, Repeat, AlertTriangle, Check, X, Clock, CalendarDays, ListFilter } from 'lucide-react';
@@ -46,14 +46,68 @@ export default function UpcomingScreen() {
 
     const allUpcoming = filtered.flatMap(r => generateUpcomingOccurrences(r, 65));
 
+    // Inject pay cycle paychecks (Premium: from account pay cycles with amounts)
+    const relevantAccounts = accountFilter === 'all'
+      ? accounts
+      : accounts.filter(a => a.id === accountFilter);
+
+    for (const acc of relevantAccounts) {
+      if (!acc.payCycles) continue;
+      for (const cycle of acc.payCycles) {
+        if (!cycle.nextPayDate || !cycle.frequency) continue;
+        const amount = cycle.amount || 0;
+        const name = cycle.name ? `${cycle.name} Paycheck` : 'Paycheck';
+
+        // Generate multiple occurrences for the look-ahead window
+        let dateObj = new Date(cycle.nextPayDate + 'T00:00:00');
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 65);
+
+        while (dateObj <= endDate) {
+          const dateStr = dateObj.toISOString().split('T')[0];
+          const daysOut = daysUntil(dateStr);
+
+          if (daysOut > 0) {
+            allUpcoming.push({
+              id: `paycycle-${cycle.id}-${dateStr}`,
+              recurringId: `paycycle-${cycle.id}`,
+              accountId: acc.id,
+              description: name,
+              amount: amount,
+              type: 'income',
+              date: dateStr,
+              categoryId: 'cat-paycheck',
+              isPayCycleGenerated: true,
+              payCycleId: cycle.id,
+              daysOut,
+              isApproximate: false,
+              isAutoDraft: false,
+            });
+          }
+
+          // Advance to next occurrence
+          switch (cycle.frequency) {
+            case 'weekly': dateObj.setDate(dateObj.getDate() + 7); break;
+            case 'biweekly': dateObj.setDate(dateObj.getDate() + 14); break;
+            case 'semi-monthly': {
+              const d = dateObj.getDate();
+              if (d < 15) dateObj.setDate(15);
+              else { dateObj.setMonth(dateObj.getMonth() + 1); dateObj.setDate(1); }
+              break;
+            }
+            case 'monthly': dateObj.setMonth(dateObj.getMonth() + 1); break;
+            default: dateObj.setDate(dateObj.getDate() + 14);
+          }
+        }
+      }
+    }
+
     // Load all transactions to dedup against posted items
     const allTransactions = [];
     for (const acc of accounts) {
       const txs = await db.getTransactions(acc.id);
       allTransactions.push(...txs);
     }
-
-    const today = todayISO();
 
     // Filter out occurrences that have already been posted
     const deduped = allUpcoming.filter(item => {
@@ -71,6 +125,14 @@ export default function UpcomingScreen() {
         return daysDiff <= 7;
       });
       return !hasMatch;
+    });
+
+    // Add daysOut for items that don't have it
+    const today = todayISO();
+    deduped.forEach(item => {
+      if (item.daysOut === undefined) {
+        item.daysOut = daysUntil(item.date);
+      }
     });
 
     deduped.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -350,6 +412,8 @@ export default function UpcomingScreen() {
                                 <span className="text-warning-600 font-medium">Needs verify</span>
                               ) : isDueSoon ? (
                                 <span className="text-blue-500 font-medium">Due soon</span>
+                              ) : item.isPayCycleGenerated ? (
+                                'Pay cycle'
                               ) : (
                                 item.isAutoDraft ? 'Auto' : 'Manual'
                               )}
@@ -379,10 +443,64 @@ export default function UpcomingScreen() {
         {/* Manage tab */}
         {showTab === 'manage' && (
           <div>
-            {filteredRecurring.length === 0 ? (
-              <div className="text-center py-12">
+            {/* Pay cycle paychecks (from account settings) */}
+            {(() => {
+              const relevantAccts = filterAccountId === 'all'
+                ? accounts
+                : accounts.filter(a => a.id === filterAccountId);
+              const payCycleEntries = [];
+              for (const acc of relevantAccts) {
+                if (!acc.payCycles) continue;
+                for (const cycle of acc.payCycles) {
+                  if (!cycle.frequency || !cycle.nextPayDate) continue;
+                  payCycleEntries.push({ ...cycle, accountId: acc.id, accountName: acc.name });
+                }
+              }
+              if (payCycleEntries.length > 0) {
+                return (
+                  <div className="mb-3">
+                    <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1.5 px-1">Paychecks (from account settings)</p>
+                    {payCycleEntries.map((cycle) => {
+                      const freqLabel = { weekly: 'Weekly', biweekly: 'Every 2 wks', monthly: 'Monthly', 'semi-monthly': '1st & 15th' }[cycle.frequency] || cycle.frequency;
+                      return (
+                        <div key={cycle.id} className="flex items-center gap-3 py-3 px-1 border-b border-border-light">
+                          <div onClick={() => navigate('/settings')}
+                            className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
+                              style={{ backgroundColor: '#1D9E7515', color: '#1D9E75' }}>
+                              {cycle.name?.charAt(0)?.toUpperCase() || '$'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{cycle.name ? `${cycle.name} Paycheck` : 'Paycheck'}</p>
+                              <p className="text-xs text-text-muted mt-0.5">
+                                {freqLabel} · Next: {cycle.nextPayDate}
+                                {accounts.length > 1 ? ` · ${cycle.accountName}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="shrink-0">
+                            {cycle.amount ? (
+                              <p className="text-sm font-medium text-success-500">{formatCurrency(cycle.amount)}</p>
+                            ) : (
+                              <p className="text-[10px] text-text-muted">No amount</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <p className="text-[9px] text-text-muted text-center mt-1.5">Edit paychecks in Settings → Account</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Recurring bills */}
+            <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1.5 px-1">Bills & recurring expenses</p>
+            {filteredRecurring.filter(r => r.type !== 'income').length === 0 && filteredRecurring.filter(r => r.type === 'income').length === 0 ? (
+              <div className="text-center py-8">
                 <Repeat size={24} className="text-text-muted mx-auto mb-2" />
-                <p className="text-sm text-text-muted">No recurring transactions</p>
+                <p className="text-sm text-text-muted">No recurring bills</p>
                 <button onClick={() => navigate('/add-recurring')} className="mt-3 text-sm text-brand-500 font-medium">
                   Add your first one
                 </button>
@@ -399,7 +517,7 @@ export default function UpcomingScreen() {
                   <div key={r.id} className="flex items-center gap-3 py-3 px-1 border-b border-border-light">
                     <div onClick={() => navigate(`/edit-recurring/${r.id}`)}
                       className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium shrink-0"
+                      <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
                         style={{ backgroundColor: `${color}15`, color }}>
                         {r.description?.charAt(0)?.toUpperCase() || '?'}
                       </div>

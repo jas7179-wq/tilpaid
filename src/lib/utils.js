@@ -166,6 +166,7 @@ export function createAccount({ name, type, balance, payFrequency, nextPayDate }
       name: '',
       frequency: payFrequency,
       nextPayDate,
+      amount: null, // Premium: auto-generate scheduled paycheck
     });
   }
 
@@ -237,14 +238,61 @@ export function getNextPayInfo(account) {
     return null;
   }
 
-  let nearest = null;
+  // Find the earliest date
+  let nearestDate = null;
   for (const cycle of cycles) {
     if (!cycle.nextPayDate) continue;
-    if (!nearest || cycle.nextPayDate < nearest.date) {
-      nearest = { date: cycle.nextPayDate, cycleName: cycle.name || '' };
+    if (!nearestDate || cycle.nextPayDate < nearestDate) {
+      nearestDate = cycle.nextPayDate;
     }
   }
-  return nearest;
+
+  if (!nearestDate) return null;
+
+  // Collect all names that share the nearest date (within 3 days)
+  const names = cycles
+    .filter(c => c.nextPayDate && c.name)
+    .filter(c => {
+      const diff = Math.abs((new Date(c.nextPayDate) - new Date(nearestDate)) / (1000 * 60 * 60 * 24));
+      return diff <= 3;
+    })
+    .map(c => c.name);
+
+  const cycleName = names.length > 1 ? names.join(' / ') : (names[0] || '');
+
+  return { date: nearestDate, cycleName };
+}
+
+// Generate scheduled paycheck items from pay cycles (Premium feature)
+// Returns array of scheduled items that look like recurring auto items
+export function generatePayCycleScheduledItems(account) {
+  const cycles = account.payCycles || [];
+  const items = [];
+  const today = todayISO();
+
+  for (const cycle of cycles) {
+    // Only generate if premium amount is set
+    if (!cycle.amount || !cycle.nextPayDate || !cycle.frequency) continue;
+
+    // Only show if the next pay date is in the future
+    if (cycle.nextPayDate <= today) continue;
+
+    items.push({
+      id: `paycycle-${cycle.id}`,
+      recurringId: `paycycle-${cycle.id}`,
+      accountId: account.id,
+      description: cycle.name ? `${cycle.name} Paycheck` : 'Paycheck',
+      amount: cycle.amount,
+      type: 'income',
+      date: cycle.nextPayDate,
+      categoryId: 'cat-paycheck',
+      isRecurringAuto: true,
+      isPayCycleGenerated: true,
+      payCycleId: cycle.id,
+    });
+  }
+
+  return items;
 }
 
 export function createReconciliation({ accountId, balance, matched }) {
