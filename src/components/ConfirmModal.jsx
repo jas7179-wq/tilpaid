@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 
 export default function ConfirmModal({
@@ -12,6 +12,10 @@ export default function ConfirmModal({
   danger = true,
 }) {
   const [typed, setTyped] = useState('');
+
+  useEffect(() => {
+    if (isOpen) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
