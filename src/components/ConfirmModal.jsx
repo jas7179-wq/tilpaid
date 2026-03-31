@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, AlertTriangle } from 'lucide-react';
 
 export default function ConfirmModal({
@@ -12,9 +12,17 @@ export default function ConfirmModal({
   danger = true,
 }) {
   const [typed, setTyped] = useState('');
+  const modalRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen) window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (isOpen) {
+      // Scroll page to top so the fixed modal is fully visible
+      window.scrollTo(0, 0);
+      // Small delay to ensure modal is rendered before we try to scroll it into view
+      setTimeout(() => {
+        modalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -33,8 +41,8 @@ export default function ConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center px-6 pt-[10vh] pb-4 overflow-y-auto overlay-enter" onClick={handleClose}>
-      <div className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-5 shadow-xl sheet-enter my-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-6 overlay-enter" onClick={handleClose}>
+      <div ref={modalRef} className="bg-surface-card w-full max-w-sm rounded-2xl px-5 pt-5 pb-5 shadow-xl sheet-enter" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 mb-3">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
             danger ? 'bg-danger-50' : 'bg-warning-50'
