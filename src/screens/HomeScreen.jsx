@@ -7,7 +7,7 @@ import StartingBalanceLine from '../components/StartingBalanceLine';
 import AccountSwitcher from '../components/AccountSwitcher';
 import BottomNav from '../components/BottomNav';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Search, X, CalendarClock, Zap } from 'lucide-react';
+import { Landmark, Search, X, CalendarClock, Zap } from 'lucide-react';
 import OnboardingOverlay from '../components/OnboardingOverlay';
 
 export default function HomeScreen() {
@@ -257,56 +257,56 @@ export default function HomeScreen() {
     <div className="min-h-screen flex flex-col bg-surface">
       {/* ── Header ── */}
       <div className="px-5 pt-5 pb-2">
-        {/* Top row: account + reconcile */}
+        {/* Top row: account + verify */}
         <div className="flex justify-between items-center mb-3">
           <AccountSwitcher />
           <button
             onClick={() => navigate('/reconcile')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card border border-border active:scale-95 transition-transform"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card border border-border"
           >
-            <CheckCircle size={13} className="text-text-muted" />
-            <span className="text-[10px] text-text-muted font-medium">Check</span>
+            <Landmark size={12} className="text-text-muted" />
+            <span className="text-[10px] text-text-muted font-medium">Verify</span>
           </button>
         </div>
 
         {/* Hero balance */}
-        <div className="mb-1">
-          <p className={`text-[38px] font-bold tracking-tight leading-none ${tilPaidColor}`}>
+        <div className="mb-2">
+          <p className={`text-[42px] font-bold tracking-tight leading-none ${tilPaidColor}`}>
             {formatCurrency(tilPaidBalance)}
           </p>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-[11px] text-brand-500 font-semibold">TilPaid</span>
-            {daysTilPay !== null && daysTilPay > 0 && (
-              <>
-                <span className="text-text-muted text-[11px]">·</span>
-                <span className="text-[11px] text-brand-500 font-semibold">{daysTilPay}d til pay{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}</span>
-              </>
-            )}
-            {daysTilPay === 0 && (
-              <>
-                <span className="text-text-muted text-[11px]">·</span>
-                <span className="text-[11px] text-success-500 font-semibold">Payday!{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}</span>
-              </>
-            )}
-          </div>
+
+          {/* Countdown pill */}
+          {daysTilPay !== null && daysTilPay > 0 && (
+            <div className="inline-flex items-center gap-1.5 mt-2 bg-brand-50 px-3 py-1 rounded-full">
+              <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
+              <span className="text-[11px] text-brand-700 font-semibold">
+                {daysTilPay} {daysTilPay === 1 ? 'day' : 'days'} til payday{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}
+              </span>
+            </div>
+          )}
+          {daysTilPay === 0 && (
+            <div className="inline-flex items-center gap-1.5 mt-2 bg-success-50 px-3 py-1 rounded-full">
+              <div className="w-1.5 h-1.5 rounded-full bg-success-500" />
+              <span className="text-[11px] text-success-700 font-semibold">
+                Payday!{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Info row */}
-        <div className="flex items-center gap-3 mt-2 mb-2 py-2.5 px-3.5 rounded-[14px] bg-surface-card border border-border shadow-sm">
-          <div className="flex-1">
-            <p className="text-[10px] text-text-muted uppercase tracking-wider">Bank balance</p>
-            <p className="text-[13px] font-medium mt-0.5">{formatCurrency(actualBalance)}</p>
+        {/* Info cards */}
+        <div className="flex gap-2 mb-2">
+          <div className="flex-1 bg-surface-card rounded-[12px] border border-border px-3 py-2.5">
+            <p className="text-[10px] text-text-muted">Bank</p>
+            <p className="text-[14px] font-semibold mt-0.5">{formatCurrency(actualBalance)}</p>
           </div>
           {showAfterPayday && (
-            <>
-              <div className="w-px h-7 bg-border" />
-              <div className="flex-1">
-                <p className="text-[10px] text-text-muted uppercase tracking-wider">After payday</p>
-                <p className={`text-[13px] font-medium mt-0.5 ${afterPayday < 0 ? 'text-danger-500' : ''}`}>
-                  {formatCurrency(afterPayday)}
-                </p>
-              </div>
-            </>
+            <div className="flex-1 bg-surface-card rounded-[12px] border border-border px-3 py-2.5">
+              <p className="text-[10px] text-text-muted">After payday</p>
+              <p className={`text-[14px] font-semibold mt-0.5 ${afterPayday < 0 ? 'text-danger-500' : ''}`}>
+                {formatCurrency(afterPayday)}
+              </p>
+            </div>
           )}
         </div>
       </div>
@@ -330,9 +330,9 @@ export default function HomeScreen() {
                   </svg>
                 </div>
               </div>
-              <p className="text-text-secondary text-sm font-medium mb-1">No transactions yet</p>
+              <p className="text-text-secondary text-sm font-medium mb-1">Your clean slate</p>
               <p className="text-text-muted text-xs leading-relaxed">
-                Tap <span className="text-brand-500 font-medium">Add</span> in the nav below to log your first expense
+                Tap the <span className="text-brand-500 font-medium">+</span> button to log your first expense
               </p>
             </div>
             <StartingBalanceLine account={activeAccount} />
@@ -404,7 +404,7 @@ export default function HomeScreen() {
 
             {/* Recent section */}
             <p className="text-xs text-text-secondary uppercase tracking-wider mb-2 px-1">
-              {searchQuery ? 'Search results' : 'Recent transactions'}
+              {searchQuery ? 'Search results' : 'Recent'}
             </p>
             {(() => {
               const txList = searchQuery ? transactionsWithBalances : recentTransactions;

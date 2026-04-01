@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { todayISO } from '../lib/utils';
 import { addDays, addWeeks, format } from 'date-fns';
+import { DollarSign } from 'lucide-react';
 
 const ACCOUNT_TYPES = [
   { type: 'checking', label: 'Checking' },
@@ -38,8 +39,8 @@ export default function SetupScreen() {
   if (step === 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 py-10">
-        <div className="w-[72px] h-[72px] rounded-2xl bg-gradient-to-br from-brand-600 to-success-500 flex items-center justify-center mb-4">
-          <span className="text-white text-3xl font-medium">T</span>
+        <div className="w-[72px] h-[72px] rounded-2xl bg-gradient-to-br from-[#4A8B3F] to-[#2DBF7E] flex items-center justify-center mb-4 shadow-lg shadow-brand-500/20">
+          <DollarSign size={32} className="text-white" />
         </div>
         <h1 className="text-3xl font-semibold mb-2">TilPaid</h1>
         <p className="text-text-secondary text-[15px] mb-10">Know what's left til payday</p>

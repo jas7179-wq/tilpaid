@@ -164,16 +164,11 @@ export default function TransactionCard({ transaction, isScheduled = false }) {
         ) : (
           <div className="text-right shrink-0">
             <p
-              className="text-sm font-medium"
+              className="text-[14px] font-semibold"
               style={{ color: isPositive ? '#1D9E75' : undefined }}
             >
               {formatCurrency(transaction.amount)}
             </p>
-            {transaction.runningBalance !== undefined && (
-              <p className="text-[11px] text-text-muted mt-0.5">
-                bal {formatCurrency(transaction.runningBalance)}
-              </p>
-            )}
           </div>
         )}
       </div>

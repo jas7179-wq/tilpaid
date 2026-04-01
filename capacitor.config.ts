@@ -5,34 +5,32 @@ const config: CapacitorConfig = {
   appName: 'TilPaid',
   webDir: 'dist',
   server: {
-    // Remove this block for production builds
-    // url: 'http://localhost:5173',
+    // Uncomment for live reload during development:
+    // url: 'http://YOUR_LOCAL_IP:5173',
     // cleartext: true,
   },
   plugins: {
     SplashScreen: {
       launchAutoHide: true,
       launchShowDuration: 2000,
-      backgroundColor: '#2DBF7E',
+      backgroundColor: '#3A7032',
       showSpinner: false,
       androidScaleType: 'CENTER_CROP',
       splashFullScreen: true,
       splashImmersive: true,
     },
     StatusBar: {
-      style: 'LIGHT',
-      backgroundColor: '#F8F9FA',
+      style: 'DARK',
+      backgroundColor: '#F7F9F4',
     },
-    Haptics: {
-      // Uses defaults
-    },
+    Haptics: {},
   },
   ios: {
     scheme: 'TilPaid',
     contentInset: 'automatic',
   },
   android: {
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#F7F9F4',
   },
 };
 

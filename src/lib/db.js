@@ -99,23 +99,31 @@ export async function deleteTransaction(id) {
 // ── Categories ──
 
 export const DEFAULT_CATEGORIES = [
-  { id: 'cat-rent', name: 'Rent/Mortgage', color: '#993556', icon: 'Home' },
-  { id: 'cat-utilities', name: 'Utilities', color: '#BA7517', icon: 'Zap' },
+  // ── Everyday spending (high frequency) ──
   { id: 'cat-groceries', name: 'Groceries', color: '#1D9E75', icon: 'ShoppingCart' },
   { id: 'cat-dining', name: 'Dining', color: '#D85A30', icon: 'UtensilsCrossed' },
-  { id: 'cat-fuel', name: 'Fuel', color: '#378ADD', icon: 'Fuel' },
-  { id: 'cat-insurance', name: 'Insurance', color: '#2E86C1', icon: 'Shield' },
-  { id: 'cat-creditcards', name: 'Credit Cards', color: '#5F5E5A', icon: 'CreditCard' },
-  { id: 'cat-subscriptions', name: 'Subscriptions', color: '#534AB7', icon: 'Repeat' },
-  { id: 'cat-medical', name: 'Medical', color: '#E24B4A', icon: 'Heart' },
-  { id: 'cat-tithe', name: 'Tithe', color: '#0F6E56', icon: 'HandHeart' },
-  { id: 'cat-transfers', name: 'Transfers', color: '#7F8C8D', icon: 'ArrowLeftRight' },
-  { id: 'cat-bankcharge', name: 'Bank Charge', color: '#791F1F', icon: 'AlertCircle' },
+  { id: 'cat-fuel', name: 'Gas', color: '#378ADD', icon: 'Fuel' },
+  { id: 'cat-shopping', name: 'Shopping', color: '#534AB7', icon: 'ShoppingBag' },
+  { id: 'cat-transport', name: 'Transportation', color: '#5F7A5A', icon: 'Car' },
+
+  // ── Monthly bills ──
+  { id: 'cat-rent', name: 'Rent / Mortgage', color: '#993556', icon: 'Home' },
+  { id: 'cat-bills', name: 'Bills & Utilities', color: '#BA7517', icon: 'Zap' },
+  { id: 'cat-subscriptions', name: 'Subscriptions', color: '#854F0B', icon: 'Repeat' },
+
+  // ── Life categories ──
+  { id: 'cat-health', name: 'Health', color: '#E24B4A', icon: 'Heart' },
+  { id: 'cat-entertainment', name: 'Entertainment', color: '#7F77DD', icon: 'Ticket' },
+  { id: 'cat-kids', name: 'Kids & Family', color: '#D4537E', icon: 'Baby' },
+  { id: 'cat-pets', name: 'Pets', color: '#639922', icon: 'PawPrint' },
+  { id: 'cat-personal', name: 'Personal', color: '#0F6E56', icon: 'User' },
+
+  // ── Income ──
   { id: 'cat-paycheck', name: 'Paycheck', color: '#1D9E75', icon: 'Banknote', isIncome: true, isPaycheck: true },
   { id: 'cat-income', name: 'Income', color: '#1D9E75', icon: 'DollarSign', isIncome: true },
-  { id: 'cat-dividends', name: 'Dividends', color: '#27AE60', icon: 'TrendingUp', isIncome: true },
-  { id: 'cat-interest', name: 'Interest', color: '#16A085', icon: 'Percent', isIncome: true },
   { id: 'cat-refund', name: 'Refund', color: '#2ECC71', icon: 'RotateCcw', isIncome: true },
+
+  // ── Catch-all ──
   { id: 'cat-other', name: 'Other', color: '#6B7280', icon: 'MoreHorizontal' },
 ];
 
