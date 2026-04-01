@@ -234,28 +234,6 @@ export default function UpcomingScreen() {
     ? recurringList
     : recurringList.filter(r => r.accountId === filterAccountId);
 
-  if (!isPremium) {
-    return (
-      <div className="min-h-screen bg-surface flex flex-col">
-        <div className="flex-1 px-5 py-5">
-          <h1 className="text-2xl font-semibold mb-2">Recurring</h1>
-          <p className="text-sm text-text-secondary mb-8">See what's ahead between paychecks</p>
-          <div className="bg-gradient-to-br from-brand-50 to-success-50 rounded-[14px] border border-brand-100 p-6 text-center">
-            <Calendar size={32} className="text-brand-500 mx-auto mb-3" />
-            <p className="text-base font-semibold text-brand-700 mb-2">Unlock look-ahead view</p>
-            <p className="text-sm text-brand-600 leading-relaxed mb-4">
-              Set up recurring bills and deposits to see what's coming, when it's due, and your projected balance.
-            </p>
-            <button className="w-full py-2.5 rounded-[10px] bg-brand-500 text-white text-sm font-medium">
-              Upgrade to Premium
-            </button>
-          </div>
-        </div>
-        <BottomNav />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-surface flex flex-col">
       <div className="flex-1 px-5 py-5">
@@ -303,9 +281,13 @@ export default function UpcomingScreen() {
           </div>
           <div className="bg-surface-card rounded-[10px] border border-border p-3 text-center">
             <p className="text-[10px] text-text-muted uppercase tracking-wider">Projected</p>
-            <p className={`text-sm font-semibold mt-0.5 ${
-              projectedBalance < 0 ? 'text-danger-500' : projectedBalance <= 250 ? 'text-warning-500' : 'text-text'
-            }`}>{formatCurrency(projectedBalance)}</p>
+            {isPremium ? (
+              <p className={`text-sm font-semibold mt-0.5 ${
+                projectedBalance < 0 ? 'text-danger-500' : projectedBalance <= 250 ? 'text-warning-500' : 'text-text'
+              }`}>{formatCurrency(projectedBalance)}</p>
+            ) : (
+              <p className="text-[10px] text-brand-500 font-medium mt-1">Premium</p>
+            )}
           </div>
         </div>
 
@@ -322,11 +304,11 @@ export default function UpcomingScreen() {
               </span>
             )}
           </button>
-          <button onClick={() => setShowTab('calendar')}
+          <button onClick={() => isPremium ? setShowTab('calendar') : null}
             className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               showTab === 'calendar' ? 'border-brand-500 text-brand-600' : 'border-transparent text-text-muted'
-            }`}>
-            Calendar
+            } ${!isPremium ? 'opacity-40' : ''}`}>
+            Calendar {!isPremium && <span className="text-[8px] align-top">PRO</span>}
           </button>
           <button onClick={() => setShowTab('manage')}
             className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
