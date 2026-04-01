@@ -90,7 +90,7 @@ export default function HomeScreen() {
       // De-duplicate: skip recurring items that already have a posted transaction
       const autoScheduled = allUpcoming
         .filter(item => {
-          if (item.date <= today) return false;
+          if (item.date < today) return false;
           const hasMatch = transactionsWithBalances.some(tx => {
             if (tx.isAdjustment) return false;
             // Exact match: tagged with same recurringId and occurrence date
