@@ -78,6 +78,7 @@ function AppRoutes() {
   }
 
   return (
+    <div style={{ paddingTop: 'env(safe-area-inset-top)' }}>
     <ScreenTransition>
       <Routes>
         <Route path="/" element={<HomeScreen />} />
@@ -94,6 +95,7 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </ScreenTransition>
+    </div>
   );
 }
 
@@ -102,8 +104,7 @@ function AppContent() {
     <Routes>
       <Route path="/welcome" element={<LandingPage />} />
       <Route path="/*" element={
-        <div className="max-w-md mx-auto min-h-screen bg-surface"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="max-w-md mx-auto min-h-screen bg-surface">
           <AppRoutes />
         </div>
       } />
