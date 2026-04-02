@@ -102,7 +102,8 @@ function AppContent() {
     <Routes>
       <Route path="/welcome" element={<LandingPage />} />
       <Route path="/*" element={
-        <div className="max-w-md mx-auto min-h-screen bg-surface">
+        <div className="max-w-md mx-auto min-h-screen bg-surface"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <AppRoutes />
         </div>
       } />
