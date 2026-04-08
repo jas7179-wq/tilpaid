@@ -236,11 +236,12 @@ export default function UpcomingScreen() {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col">
-      <div className="flex-1 px-5 py-5">
+      {/* Hero header with gradient */}
+      <div className="hero-gradient px-5 pt-5 pb-4 rounded-b-[20px]">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
           <div>
-            <h1 className="text-2xl font-semibold">Recurring</h1>
+            <h1 className="text-2xl font-bold">Recurring</h1>
             {needsVerifyCount > 0 && (
               <p className="text-xs text-warning-600 font-medium mt-0.5">
                 {needsVerifyCount} item{needsVerifyCount > 1 ? 's' : ''} to verify
@@ -248,7 +249,7 @@ export default function UpcomingScreen() {
             )}
           </div>
           <button onClick={() => navigate('/add-recurring')}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200">
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-white/60 text-brand-600 border border-white/40">
             <Plus size={12} /> Add
           </button>
         </div>
@@ -258,31 +259,31 @@ export default function UpcomingScreen() {
           <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
             <button onClick={() => handleFilterChange('all')}
               className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                filterAccountId === 'all' ? 'bg-brand-500 text-white' : 'bg-surface-card border border-border text-text-secondary'
+                filterAccountId === 'all' ? 'bg-brand-500 text-white' : 'bg-white/60 text-text-secondary'
               }`}>All accounts</button>
             {accounts.map((acc) => (
               <button key={acc.id} onClick={() => handleFilterChange(acc.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                  filterAccountId === acc.id ? 'bg-brand-500 text-white' : 'bg-surface-card border border-border text-text-secondary'
+                  filterAccountId === acc.id ? 'bg-brand-500 text-white' : 'bg-white/60 text-text-secondary'
                 }`}>{acc.name}</button>
             ))}
           </div>
         )}
 
         {/* Summary cards */}
-        <div className="grid grid-cols-3 gap-2 mb-5">
-          <div className="bg-surface-card rounded-[10px] border border-border p-3 text-center">
-            <p className="text-[10px] text-text-muted uppercase tracking-wider">Bills</p>
-            <p className="text-sm font-semibold text-danger-500 mt-0.5">{formatCurrency(totalBills)}</p>
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <div className="bg-white/70 rounded-[12px] p-3 text-center" style={{ backdropFilter: 'blur(8px)' }}>
+            <p className="text-[10px] text-text-muted">Bills</p>
+            <p className="text-sm font-bold text-danger-500 mt-0.5">{formatCurrency(totalBills)}</p>
           </div>
-          <div className="bg-surface-card rounded-[10px] border border-border p-3 text-center">
-            <p className="text-[10px] text-text-muted uppercase tracking-wider">Deposits</p>
-            <p className="text-sm font-semibold text-success-500 mt-0.5">{formatCurrency(totalDeposits)}</p>
+          <div className="bg-white/70 rounded-[12px] p-3 text-center" style={{ backdropFilter: 'blur(8px)' }}>
+            <p className="text-[10px] text-text-muted">Deposits</p>
+            <p className="text-sm font-bold text-success-500 mt-0.5">{formatCurrency(totalDeposits)}</p>
           </div>
-          <div className="bg-surface-card rounded-[10px] border border-border p-3 text-center">
-            <p className="text-[10px] text-text-muted uppercase tracking-wider">Projected</p>
+          <div className="bg-white/70 rounded-[12px] p-3 text-center" style={{ backdropFilter: 'blur(8px)' }}>
+            <p className="text-[10px] text-text-muted">Projected</p>
             {isPremium ? (
-              <p className={`text-sm font-semibold mt-0.5 ${
+              <p className={`text-sm font-bold mt-0.5 ${
                 projectedBalance < 0 ? 'text-danger-500' : projectedBalance <= 250 ? 'text-warning-500' : 'text-text'
               }`}>{formatCurrency(projectedBalance)}</p>
             ) : (
@@ -290,9 +291,11 @@ export default function UpcomingScreen() {
             )}
           </div>
         </div>
+      </div>
 
+      <div className="flex-1 px-5 pt-4">
         {/* Tabs */}
-        <div className="flex border-b border-border mb-4">
+        <div className="flex border-b border-border-light mb-4">
           <button onClick={() => setShowTab('upcoming')}
             className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               showTab === 'upcoming' ? 'border-brand-500 text-brand-600' : 'border-transparent text-text-muted'
@@ -344,20 +347,22 @@ export default function UpcomingScreen() {
 
                     return (
                       <div key={item.id}
-                        className={`flex items-center gap-3 py-3 px-2 border-b border-border-light rounded-lg mb-0.5 ${
-                          isDue ? 'bg-warning-50 border-warning-200'
-                            : isDueSoon ? 'bg-blue-50/50 border-blue-100' : ''
+                        className={`flex items-center gap-3 py-3 px-3 mb-2 rounded-[14px] ${
+                          isDue ? 'bg-warning-50'
+                            : isDueSoon ? 'bg-blue-50/50'
+                            : isIncome ? 'bg-white' : 'bg-white'
                         }`}
+                        style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08)' }}
                       >
                         {/* Left: avatar */}
                         <div
-                          onClick={() => navigate(`/edit-recurring/${item.recurringId}`)}
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-medium shrink-0 cursor-pointer"
-                          style={{
-                            backgroundColor: isDue ? '#F59E0B18' : isDueSoon ? '#4A8B3F12' : `${color}12`,
-                            color: isDue ? '#D97706' : isDueSoon ? '#2563EB' : color,
-                            border: isDue ? '1.5px solid #F59E0B50' : isDueSoon ? '1.5px solid #4A8B3F30' : `1px dashed ${color}40`,
-                          }}>
+                          onClick={() => item.isPayCycleGenerated ? null : navigate(`/edit-recurring/${item.recurringId}`)}
+                          className={`w-10 h-10 rounded-[12px] flex items-center justify-center text-xs font-bold shrink-0 ${
+                            isDue ? 'bg-warning-500/15 text-warning-600'
+                              : isIncome ? 'bg-success-500/15 text-success-600'
+                              : 'bg-brand-50 text-brand-600'
+                          } ${!item.isPayCycleGenerated ? 'cursor-pointer' : ''}`}
+                        >
                           {isDue
                             ? <AlertTriangle size={14} />
                             : isDueSoon
@@ -366,13 +371,13 @@ export default function UpcomingScreen() {
                           }
                         </div>
 
-                        {/* Middle: info (tap to edit) */}
+                        {/* Middle: info */}
                         <div
-                          onClick={() => navigate(`/edit-recurring/${item.recurringId}`)}
-                          className="flex-1 min-w-0 cursor-pointer"
+                          onClick={() => item.isPayCycleGenerated ? null : navigate(`/edit-recurring/${item.recurringId}`)}
+                          className={`flex-1 min-w-0 ${!item.isPayCycleGenerated ? 'cursor-pointer' : ''}`}
                         >
-                          <p className="text-sm font-medium truncate">{item.description}</p>
-                          <p className="text-xs text-text-muted mt-0.5">
+                          <p className="text-sm font-semibold truncate">{item.description}</p>
+                          <p className="text-[11px] text-text-muted mt-0.5">
                             {cat?.name || 'Uncategorized'}
                             {accName && ` · ${accName}`}
                             {' · '}{formatDate(item.date)}
@@ -383,11 +388,8 @@ export default function UpcomingScreen() {
                         {/* Right: amount + verify button */}
                         <div className="text-right shrink-0 flex items-center gap-2">
                           <div>
-                            <p className={`text-sm font-medium ${isIncome ? 'text-success-500' : ''}`}>
+                            <p className={`text-[14px] font-bold ${isIncome ? 'text-success-600' : ''}`}>
                               {formatCurrency(item.amount)}
-                              {item.isApproximate && (
-                                <span className="text-[9px] text-text-muted font-normal ml-1">est.</span>
-                              )}
                             </p>
                             <p className="text-[10px] text-text-muted mt-0.5">
                               {isDue ? (
@@ -445,16 +447,16 @@ export default function UpcomingScreen() {
                     {payCycleEntries.map((cycle) => {
                       const freqLabel = { weekly: 'Weekly', biweekly: 'Every 2 wks', monthly: 'Monthly', 'semi-monthly': '1st & 15th' }[cycle.frequency] || cycle.frequency;
                       return (
-                        <div key={cycle.id} className="flex items-center gap-3 py-3 px-1 border-b border-border-light">
+                        <div key={cycle.id} className="flex items-center gap-3 py-3 px-3 mb-2 rounded-[14px] bg-white"
+                          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08)' }}>
                           <div onClick={() => navigate('/settings')}
                             className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
-                            <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
-                              style={{ backgroundColor: '#1D9E7515', color: '#1D9E75' }}>
+                            <div className="w-10 h-10 rounded-[12px] flex items-center justify-center text-xs font-bold shrink-0 bg-success-500/15 text-success-600">
                               {cycle.name?.charAt(0)?.toUpperCase() || '$'}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{cycle.name ? `${cycle.name} Paycheck` : 'Paycheck'}</p>
-                              <p className="text-xs text-text-muted mt-0.5">
+                              <p className="text-sm font-semibold truncate">{cycle.name ? `${cycle.name} Paycheck` : 'Paycheck'}</p>
+                              <p className="text-[11px] text-text-muted mt-0.5">
                                 {freqLabel} · Next: {cycle.nextPayDate}
                                 {accounts.length > 1 ? ` · ${cycle.accountName}` : ''}
                               </p>
@@ -462,7 +464,7 @@ export default function UpcomingScreen() {
                           </div>
                           <div className="shrink-0">
                             {cycle.amount ? (
-                              <p className="text-sm font-medium text-success-500">{formatCurrency(cycle.amount)}</p>
+                              <p className="text-[14px] font-bold text-success-600">{formatCurrency(cycle.amount)}</p>
                             ) : (
                               <p className="text-[10px] text-text-muted">No amount</p>
                             )}
@@ -496,16 +498,17 @@ export default function UpcomingScreen() {
                 const accName = accounts.length > 1 ? getAccountName(r.accountId) : '';
 
                 return (
-                  <div key={r.id} className="flex items-center gap-3 py-3 px-1 border-b border-border-light">
+                  <div key={r.id} className="flex items-center gap-3 py-3 px-3 mb-2 rounded-[14px] bg-white"
+                    style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08)' }}>
                     <div onClick={() => navigate(`/edit-recurring/${r.id}`)}
                       className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
-                      <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
+                      <div className="w-10 h-10 rounded-[12px] flex items-center justify-center text-xs font-bold shrink-0"
                         style={{ backgroundColor: `${color}15`, color }}>
                         {r.description?.charAt(0)?.toUpperCase() || '?'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{r.description}</p>
-                        <p className="text-xs text-text-muted mt-0.5">
+                        <p className="text-sm font-semibold truncate">{r.description}</p>
+                        <p className="text-[11px] text-text-muted mt-0.5">
                           {freqLabel} · {isIncome ? 'Deposit' : 'Bill'}
                           {r.isAutoDraft ? ' · Auto' : ''}
                           {r.isApproximate ? ' · Est.' : ''}
@@ -514,7 +517,7 @@ export default function UpcomingScreen() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <p className={`text-sm font-medium ${isIncome ? 'text-success-500' : ''}`}>
+                      <p className={`text-[14px] font-bold ${isIncome ? 'text-success-600' : ''}`}>
                         {formatCurrency(r.amount)}
                       </p>
                       <button onClick={() => handleDelete(r.id)}

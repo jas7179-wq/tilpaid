@@ -11,7 +11,6 @@ export default function AddTransactionScreen() {
   const { categories, addTransaction, lastAdjustment, isPremium, nextPayDate, activeAccount } = useApp();
   const navigate = useNavigate();
 
-  // Effective max date: account payday > global payday > 30 days out
   const effectiveMaxDate = (() => {
     if (isPremium) return null;
     const payDate = activeAccount?.nextPayDate || nextPayDate;
@@ -32,7 +31,6 @@ export default function AddTransactionScreen() {
     if (type === 'income') return c.isIncome || c.id === 'cat-other';
     return !c.isIncome;
   }).sort((a, b) => {
-    // Paycheck always first in income list
     if (a.id === 'cat-paycheck') return -1;
     if (b.id === 'cat-paycheck') return 1;
     return 0;
@@ -82,14 +80,18 @@ export default function AddTransactionScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-surface px-5 py-5 overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-surface to-white px-5 py-5 overflow-x-hidden">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <button onClick={() => navigate('/')} className="flex items-center gap-1 text-brand-500 text-sm font-medium">
-          <ChevronLeft size={18} /> Back
+      <div className="flex justify-between items-center mb-8">
+        <button 
+          onClick={() => navigate('/')} 
+          className="flex items-center gap-1 text-brand-600 hover:text-brand-700 transition-colors"
+        >
+          <ChevronLeft size={20} />
+          <span className="font-medium">Back</span>
         </button>
-        <p className="text-base font-semibold">New transaction</p>
-        <div className="w-14" />
+        <p className="text-lg font-semibold text-text">New transaction</p>
+        <div className="w-10" />
       </div>
 
       {/* Amount - ATM style */}
@@ -101,24 +103,24 @@ export default function AddTransactionScreen() {
           autoFocus={true}
         />
 
-        {/* Type toggle */}
-        <div className="flex gap-3 justify-center mt-4">
+        {/* Modern Type Toggle */}
+        <div className="flex gap-2 justify-center mt-6 bg-surface-card rounded-3xl p-1 shadow-inner">
           <button
             onClick={() => { setType('expense'); setCategoryId(''); }}
-            className={`px-7 py-2.5 rounded-full text-sm font-medium transition-colors ${
+            className={`flex-1 px-6 py-3 rounded-3xl text-sm font-semibold transition-all ${
               type === 'expense'
-                ? 'bg-danger-500 text-white'
-                : 'border border-border text-text-secondary'
+                ? 'bg-danger-500 text-white shadow-sm'
+                : 'text-text-secondary hover:bg-white'
             }`}
           >
             Expense
           </button>
           <button
             onClick={() => { setType('income'); setCategoryId(''); }}
-            className={`px-7 py-2.5 rounded-full text-sm font-medium transition-colors ${
+            className={`flex-1 px-6 py-3 rounded-3xl text-sm font-semibold transition-all ${
               type === 'income'
-                ? 'bg-success-500 text-white'
-                : 'border border-border text-text-secondary'
+                ? 'bg-success-500 text-white shadow-sm'
+                : 'text-text-secondary hover:bg-white'
             }`}
           >
             Income
@@ -184,7 +186,6 @@ export default function AddTransactionScreen() {
               }
             }}
             className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border appearance-none"
-            style={{ maxWidth: '100%' }}
           />
         </div>
         {!isPremium && effectiveMaxDate && (

@@ -159,3 +159,48 @@
 .splash-content {
   animation: splashIn 0.4s ease-out both;
 }
+
+/* Balance number animation */
+@keyframes balancePop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.balance-pop {
+  animation: balancePop 0.3s ease-out;
+}
+
+/* Progress ring */
+.progress-ring-circle {
+  transition: stroke-dashoffset 0.6s ease-out;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+/* Scheduled card styles */
+.scheduled-card-expense {
+  background: linear-gradient(135deg, #FCEBEB 0%, #FFF5F5 100%);
+  border: 0.5px solid #F0C4C4;
+}
+
+.scheduled-card-income {
+  background: linear-gradient(135deg, #E1F5EE 0%, #F0FAF5 100%);
+  border: 0.5px solid #B0E0CC;
+}
+
+/* Hero gradient */
+.hero-gradient {
+  background: linear-gradient(160deg, #F7F9F4 0%, #EEF4E8 40%, #E4EFD8 100%);
+}
+
+/* Card hover/tap lift */
+@keyframes cardTap {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+.card-tap {
+  animation: cardTap 0.15s ease-out;
+}

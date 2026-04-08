@@ -6,7 +6,7 @@ import * as db from '../lib/db';
 import * as api from '../lib/api';
 import * as sync from '../lib/sync';
 import BottomNav from '../components/BottomNav';
-import { Plus, Pencil, Trash2, X, Check, RotateCcw, Download, Cloud, CloudOff, RefreshCw, LogOut } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, RotateCcw, Download, Cloud, CloudOff, RefreshCw, LogOut, ChevronLeft } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
 
 const PRESET_COLORS = [
@@ -281,97 +281,95 @@ export default function SettingsScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col overflow-x-hidden">
-      <div className="flex-1 px-5 py-5 pb-4">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold">Settings</h1>
-          <button onClick={() => navigate('/')}
-            className="text-sm text-brand-500 font-medium">
-            Done
-          </button>
+    <div className="min-h-screen bg-gradient-to-b from-surface to-white px-5 py-5 overflow-x-hidden">
+      <div className="flex-1">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+          <button 
+  onClick={() => navigate('/')}
+  className="flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
+>
+  <ChevronLeft size={18} />
+  Home
+</button>
         </div>
 
-        {/* ── Sign In / Account Section ── */}
-        <div className="mb-6">
-          <p className="text-xs text-text-secondary uppercase tracking-wider mb-2">Account & Sync</p>
+                {/* ── Account & Sync Section ── */}
+        <div className="mb-8">
+          <p className="text-xs text-text-secondary uppercase tracking-wider mb-3">Account & Sync</p>
 
           {!isSignedIn ? (
-            /* ── Signed Out State ── */
-            <div className="bg-surface-card rounded-[14px] border border-border overflow-hidden">
-              <div className="px-4 pt-4 pb-3">
-                <div className="flex items-center gap-2.5 mb-1.5">
-                  <CloudOff size={18} className="text-text-muted" />
-                  <p className="text-sm font-medium">Sign in to sync your data</p>
+            /* Signed Out State */
+            <div className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden">
+              <div className="px-5 pt-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <CloudOff size={20} className="text-text-muted" />
+                  <p className="text-base font-semibold">Sign in to sync</p>
                 </div>
-                <p className="text-xs text-text-muted leading-relaxed pl-[30px]">
-                  Back up your data and access it across devices. Your data always stays on your device first.
+                <p className="text-sm text-text-muted leading-relaxed">
+                  Back up your data and access it across devices.<br />
+                  Your data always stays on your device first.
                 </p>
               </div>
 
-              <div className="px-4 pb-4 flex flex-col gap-2.5">
-                {/* Apple Sign In Button */}
+              <div className="px-5 pb-5 flex flex-col gap-3">
                 <button
                   onClick={handleAppleSignIn}
                   disabled={authLoading}
-                  className="w-full flex items-center justify-center gap-2.5 py-3 rounded-[10px] bg-black text-white text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-black text-white text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50"
                 >
-                  <AppleLogo className="w-[18px] h-[18px]" />
+                  <AppleLogo className="w-5 h-5" />
                   Sign in with Apple
                 </button>
 
-                {/* Google Sign In Button */}
                 <button
                   onClick={handleGoogleSignIn}
                   disabled={authLoading}
-                  className="w-full flex items-center justify-center gap-2.5 py-3 rounded-[10px] bg-white text-text border border-border text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl bg-white text-text border border-border text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-50"
                 >
-                  <GoogleLogo className="w-[18px] h-[18px]" />
+                  <GoogleLogo className="w-5 h-5" />
                   Sign in with Google
                 </button>
               </div>
 
-              <div className="px-4 pb-3">
-                <p className="text-[10px] text-text-muted text-center leading-relaxed">
+              <div className="px-5 pb-5 text-center">
+                <p className="text-[10px] text-text-muted">
                   We never see your password. Authentication is handled securely by Apple and Google.
                 </p>
               </div>
             </div>
           ) : (
-            /* ── Signed In State ── */
-            <div className="bg-surface-card rounded-[14px] border border-border overflow-hidden">
-              {/* User info + sync status */}
-              <div className="px-4 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-brand-50 border border-brand-200 flex items-center justify-center shrink-0">
-                    <Cloud size={16} className="text-brand-500" />
+            /* Signed In State */
+            <div className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden">
+              <div className="px-5 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl bg-brand-50 flex items-center justify-center">
+                    <Cloud size={18} className="text-brand-600" />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{userProfile?.name || userProfile?.email || 'Signed in'}</p>
-                    <p className="text-[11px] text-text-muted">
-                      Synced: {formatSyncTime(syncStatus.lastSync)}
-                    </p>
+                  <div>
+                    <p className="text-sm font-medium">{userProfile?.name || userProfile?.email || 'Signed in'}</p>
+                    <p className="text-xs text-text-muted">Synced {formatSyncTime(syncStatus.lastSync)}</p>
                   </div>
                 </div>
 
-                {/* Sync button */}
                 <button
                   onClick={handleSync}
                   disabled={isSyncing}
-                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200 disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-brand-50 text-brand-600 text-sm font-medium disabled:opacity-50"
                 >
-                  <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
-                  {isSyncing ? 'Syncing...' : 'Sync'}
+                  <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                  {isSyncing ? 'Syncing...' : 'Sync now'}
                 </button>
               </div>
 
-              {/* Sign out */}
-              <div className="border-t border-border-light">
+              <div className="border-t border-border-light px-5 py-3">
                 <button
                   onClick={handleSignOut}
-                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left"
+                  className="w-full flex items-center justify-center gap-2 text-sm font-medium text-text-secondary py-2"
                 >
-                  <LogOut size={14} className="text-text-muted" />
-                  <span className="text-xs text-text-secondary font-medium">Sign out</span>
+                  <LogOut size={16} />
+                  Sign out
                 </button>
               </div>
             </div>
@@ -595,36 +593,43 @@ export default function SettingsScreen() {
           ))}
         </div>
 
-        {/* Categories */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
+               {/* Categories */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-3">
             <p className="text-xs text-text-secondary uppercase tracking-wider">Categories</p>
             <button
               onClick={() => setShowAddCat(true)}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200"
+              className="flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-2xl bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-colors"
             >
               <Plus size={12} /> Add
             </button>
           </div>
 
           {/* Expense categories */}
-          <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1 px-1">Expenses</p>
-          <div className="bg-surface-card rounded-[10px] border border-border divide-y divide-border-light overflow-hidden mb-3">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider mb-2 px-1">Expenses</p>
+          <div className="bg-white rounded-3xl border border-border shadow-sm divide-y divide-border-light overflow-hidden mb-4">
             {localCategories.filter(c => !c.isIncome && c.id !== 'cat-other').map((cat) => (
-              <div key={cat.id} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+              <div key={cat.id} className="flex items-center gap-3 px-5 py-3">
+                <div 
+                  className="w-5 h-5 rounded-2xl shrink-0 shadow-sm"
+                  style={{ backgroundColor: cat.color }}
+                />
                 {editingCat === cat.id ? (
                   <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <input type="text" defaultValue={cat.name} autoFocus
+                    <input 
+                      type="text" 
+                      defaultValue={cat.name} 
+                      autoFocus
                       onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCategory({ ...cat, name: e.target.value }); }}
-                      className="flex-1 min-w-0 text-sm px-2 py-1 rounded border border-border focus:outline-none focus:border-brand-500 box-border" />
-                    <button onClick={() => setEditingCat(null)} className="text-text-muted p-1 shrink-0"><X size={16} /></button>
+                      className="flex-1 min-w-0 text-sm px-3 py-2 rounded-2xl border border-border focus:outline-none focus:border-brand-500 box-border"
+                    />
+                    <button onClick={() => setEditingCat(null)} className="text-text-muted p-2 shrink-0"><X size={18} /></button>
                   </div>
                 ) : (
                   <>
                     <span className="flex-1 text-sm truncate">{cat.name}</span>
-                    <button onClick={() => setEditingCat(cat.id)} className="text-text-muted p-1 shrink-0"><Pencil size={14} /></button>
-                    <button onClick={() => handleDeleteCategory(cat.id)} className="text-text-muted p-1 shrink-0"><Trash2 size={14} /></button>
+                    <button onClick={() => setEditingCat(cat.id)} className="text-text-muted p-2 shrink-0"><Pencil size={16} /></button>
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="text-text-muted p-2 shrink-0"><Trash2 size={16} /></button>
                   </>
                 )}
               </div>
@@ -632,27 +637,34 @@ export default function SettingsScreen() {
           </div>
 
           {/* Income categories */}
-          <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1 px-1">Income</p>
-          <div className="bg-surface-card rounded-[10px] border border-border divide-y divide-border-light overflow-hidden mb-3">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider mb-2 px-1">Income</p>
+          <div className="bg-white rounded-3xl border border-border shadow-sm divide-y divide-border-light overflow-hidden mb-4">
             {localCategories.filter(c => c.isIncome).sort((a, b) => {
               if (a.id === 'cat-paycheck') return -1;
               if (b.id === 'cat-paycheck') return 1;
               return 0;
             }).map((cat) => (
-              <div key={cat.id} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+              <div key={cat.id} className="flex items-center gap-3 px-5 py-3">
+                <div 
+                  className="w-5 h-5 rounded-2xl shrink-0 shadow-sm"
+                  style={{ backgroundColor: cat.color }}
+                />
                 {editingCat === cat.id ? (
                   <div className="flex-1 flex items-center gap-2 min-w-0">
-                    <input type="text" defaultValue={cat.name} autoFocus
+                    <input 
+                      type="text" 
+                      defaultValue={cat.name} 
+                      autoFocus
                       onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCategory({ ...cat, name: e.target.value }); }}
-                      className="flex-1 min-w-0 text-sm px-2 py-1 rounded border border-border focus:outline-none focus:border-brand-500 box-border" />
-                    <button onClick={() => setEditingCat(null)} className="text-text-muted p-1 shrink-0"><X size={16} /></button>
+                      className="flex-1 min-w-0 text-sm px-3 py-2 rounded-2xl border border-border focus:outline-none focus:border-brand-500 box-border"
+                    />
+                    <button onClick={() => setEditingCat(null)} className="text-text-muted p-2 shrink-0"><X size={18} /></button>
                   </div>
                 ) : (
                   <>
                     <span className="flex-1 text-sm truncate">{cat.name}</span>
-                    <button onClick={() => setEditingCat(cat.id)} className="text-text-muted p-1 shrink-0"><Pencil size={14} /></button>
-                    <button onClick={() => handleDeleteCategory(cat.id)} className="text-text-muted p-1 shrink-0"><Trash2 size={14} /></button>
+                    <button onClick={() => setEditingCat(cat.id)} className="text-text-muted p-2 shrink-0"><Pencil size={16} /></button>
+                    <button onClick={() => handleDeleteCategory(cat.id)} className="text-text-muted p-2 shrink-0"><Trash2 size={16} /></button>
                   </>
                 )}
               </div>
@@ -660,10 +672,13 @@ export default function SettingsScreen() {
           </div>
 
           {/* Other category */}
-          <div className="bg-surface-card rounded-[10px] border border-border divide-y divide-border-light overflow-hidden">
+          <div className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden">
             {localCategories.filter(c => c.id === 'cat-other').map((cat) => (
-              <div key={cat.id} className="flex items-center gap-3 px-4 py-2.5">
-                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
+              <div key={cat.id} className="flex items-center gap-3 px-5 py-3">
+                <div 
+                  className="w-5 h-5 rounded-2xl shrink-0 shadow-sm"
+                  style={{ backgroundColor: cat.color }}
+                />
                 <span className="flex-1 text-sm truncate text-text-muted">{cat.name}</span>
               </div>
             ))}
@@ -671,29 +686,29 @@ export default function SettingsScreen() {
 
           {/* Add category inline */}
           {showAddCat && (
-            <div className="bg-surface-card rounded-[10px] border border-border overflow-hidden mt-2 mb-3">
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-2">
+            <div className="bg-white rounded-3xl border border-border shadow-sm overflow-hidden mt-4">
+              <div className="px-5 py-4">
+                <div className="flex items-center gap-2 mb-3">
                   <input
                     type="text"
                     placeholder="Category name"
                     value={newCatName}
                     onChange={(e) => setNewCatName(e.target.value)}
                     autoFocus
-                    className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-brand-500 box-border"
+                    className="flex-1 min-w-0 text-sm px-4 py-3 rounded-2xl border border-border focus:outline-none focus:border-brand-500 box-border"
                   />
                   <button
                     onClick={handleAddCategory}
                     disabled={!newCatName.trim()}
-                    className="p-2 rounded-lg bg-brand-500 text-white disabled:opacity-40 shrink-0"
+                    className="p-3 rounded-2xl bg-brand-500 text-white disabled:opacity-40 shrink-0"
                   >
-                    <Check size={16} />
+                    <Check size={18} />
                   </button>
                   <button
                     onClick={() => { setShowAddCat(false); setNewCatName(''); }}
-                    className="p-2 text-text-muted shrink-0"
+                    className="p-3 text-text-muted shrink-0"
                   >
-                    <X size={16} />
+                    <X size={18} />
                   </button>
                 </div>
                 <div className="flex gap-2 flex-wrap">
@@ -701,10 +716,10 @@ export default function SettingsScreen() {
                     <button
                       key={color}
                       onClick={() => setNewCatColor(color)}
-                      className="w-6 h-6 rounded-full transition-transform"
+                      className="w-7 h-7 rounded-2xl transition-transform"
                       style={{
                         backgroundColor: color,
-                        transform: newCatColor === color ? 'scale(1.3)' : 'scale(1)',
+                        transform: newCatColor === color ? 'scale(1.25)' : 'scale(1)',
                         border: newCatColor === color ? '2px solid white' : 'none',
                         boxShadow: newCatColor === color ? `0 0 0 2px ${color}` : 'none',
                       }}
@@ -732,14 +747,14 @@ export default function SettingsScreen() {
         </div>
 
         {/* Premium upsell */}
-        <div className="mb-6">
-          <div className="bg-gradient-to-br from-brand-50 to-success-50 rounded-[14px] border border-brand-100 p-4">
-            <p className="text-sm font-semibold text-brand-700 mb-1">TilPaid Premium</p>
-            <p className="text-xs text-brand-600 leading-relaxed mb-3">
-              Recurring bills & deposits, look-ahead view, savings targets, spending trend
-              alerts, joint account access, custom warning thresholds, and more.
+        <div className="mb-8">
+          <div className="bg-gradient-to-br from-brand-50 to-success-50 rounded-3xl border border-brand-100 p-5 shadow-sm">
+            <p className="text-base font-semibold text-brand-700 mb-1">TilPaid Premium</p>
+            <p className="text-sm text-brand-600 leading-relaxed mb-4">
+              Recurring bills & deposits, look-ahead view, savings targets, spending trend alerts, 
+              joint account access, custom warning thresholds, and more.
             </p>
-            <button className="w-full py-2.5 rounded-[10px] bg-brand-500 text-white text-sm font-medium">
+            <button className="w-full py-3.5 rounded-2xl bg-brand-500 text-white text-sm font-medium active:scale-[0.98] transition-transform">
               Coming soon
             </button>
           </div>
@@ -853,12 +868,13 @@ export default function SettingsScreen() {
         </div>
 
         {/* App info */}
-        <div className="text-center text-xs text-text-muted py-4">
+        <div className="text-center text-xs text-text-muted py-6">
           <p>TilPaid v0.1.0</p>
           <p className="mt-1">Your data stays on this device</p>
         </div>
       </div>
 
+      <BottomNav />
       <ConfirmModal
         isOpen={confirmModal.isOpen}
         onClose={closeConfirm}
@@ -868,8 +884,6 @@ export default function SettingsScreen() {
         confirmWord={confirmModal.confirmWord}
         confirmLabel={confirmModal.confirmLabel}
       />
-
-      <BottomNav />
     </div>
   );
 }

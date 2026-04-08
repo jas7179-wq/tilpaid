@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatCurrency, generateUpcomingOccurrences, todayISO, daysUntil, createTransaction, getNextPayInfo, generatePayCycleScheduledItems, advancePayCycleDate } from '../lib/utils';
 import * as db from '../lib/db';
@@ -73,6 +73,19 @@ export default function HomeScreen() {
   const effectivePayDate = effectivePayInfo?.date || null;
   const effectivePayCycleName = effectivePayInfo?.cycleName || '';
   const daysTilPay = effectivePayDate ? daysUntil(effectivePayDate) : null;
+
+  // Progress ring: days elapsed / total cycle length
+  const progressRing = useMemo(() => {
+    if (!activeAccount?.payCycles?.length || !effectivePayDate) return null;
+    const cycle = activeAccount.payCycles.find(c => c.nextPayDate === effectivePayDate) || activeAccount.payCycles[0];
+    if (!cycle?.frequency) return null;
+
+    const cycleDays = { weekly: 7, biweekly: 14, 'semi-monthly': 15, monthly: 30 }[cycle.frequency] || 14;
+    const daysLeft = daysTilPay || 0;
+    const daysElapsed = cycleDays - daysLeft;
+    const progress = Math.max(0, Math.min(1, daysElapsed / cycleDays));
+    return { progress, daysLeft, cycleDays };
+  }, [activeAccount, effectivePayDate, daysTilPay]);
 
   // Load recurring → auto-populate
   useEffect(() => {
@@ -241,6 +254,18 @@ export default function HomeScreen() {
 
   const tilPaidBalance = Math.round((actualBalance + scheduledExpensesTotal) * 100) / 100;
 
+  // Balance pop animation
+  const balanceRef = useRef(null);
+  const prevBalance = useRef(null);
+  useEffect(() => {
+    if (prevBalance.current !== null && prevBalance.current !== tilPaidBalance && balanceRef.current) {
+      balanceRef.current.classList.remove('balance-pop');
+      void balanceRef.current.offsetWidth;
+      balanceRef.current.classList.add('balance-pop');
+    }
+    prevBalance.current = tilPaidBalance;
+  }, [tilPaidBalance]);
+
   // After payday
   const allScheduledTotal = allScheduled.reduce((sum, item) => sum + item.amount, 0);
   const afterPayday = Math.round((actualBalance + allScheduledTotal) * 100) / 100;
@@ -256,54 +281,84 @@ export default function HomeScreen() {
   return (
     <div className="min-h-screen flex flex-col bg-surface">
       {/* ── Header ── */}
-      <div className="px-5 pt-5 pb-2">
+      <div className="hero-gradient px-5 pt-5 pb-3 rounded-b-[20px] relative overflow-hidden">
+        {/* Subtle background texture for premium feel */}
+        <div 
+          className="absolute inset-0 opacity-[0.04] pointer-events-none"
+          style={{ 
+            backgroundImage: 'radial-gradient(circle at 30% 20%, #4A8B3F 0%, transparent 60%)'
+          }} 
+        />
+
         {/* Top row: account + verify */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex justify-between items-center mb-4">
           <AccountSwitcher />
           <button
             onClick={() => navigate('/reconcile')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-card border border-border"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/60 border border-white/40 backdrop-blur-md"
           >
             <Landmark size={12} className="text-text-muted" />
             <span className="text-[10px] text-text-muted font-medium">Verify</span>
           </button>
         </div>
 
-        {/* Hero balance */}
-        <div className="mb-2">
-          <p className={`text-[42px] font-bold tracking-tight leading-none ${tilPaidColor}`}>
-            {formatCurrency(tilPaidBalance)}
-          </p>
+        {/* Hero balance + progress ring row */}
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p ref={balanceRef} className={`text-[42px] font-bold tracking-[-2px] leading-none ${tilPaidColor}`}>
+              {formatCurrency(tilPaidBalance)}
+            </p>
+            <p className="text-[11px] text-text-muted mt-1 font-medium">TilPaid Balance</p>
+          </div>
 
-          {/* Countdown pill */}
-          {daysTilPay !== null && daysTilPay > 0 && (
-            <div className="inline-flex items-center gap-1.5 mt-2 bg-brand-50 px-3 py-1 rounded-full">
-              <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
-              <span className="text-[11px] text-brand-700 font-semibold">
-                {daysTilPay} {daysTilPay === 1 ? 'day' : 'days'} til payday{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}
-              </span>
+          {/* Progress ring stays exactly as Claude wrote it */}
+          {progressRing && daysTilPay !== null && daysTilPay > 0 && (
+            <div className="relative flex items-center justify-center w-16 h-16 shrink-0">
+              <svg width="64" height="64" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="28" fill="none" stroke="#DDE6D6" strokeWidth="4" />
+                <circle 
+                  cx="32" 
+                  cy="32" 
+                  r="28" 
+                  fill="none" 
+                  stroke="#4A8B3F" 
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  className="progress-ring-circle"
+                  strokeDasharray={`${2 * Math.PI * 28}`}
+                  strokeDashoffset={`${2 * Math.PI * 28 * (1 - progressRing.progress)}`}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-[16px] font-bold text-brand-700 leading-none">{progressRing.daysLeft}</span>
+                <span className="text-[8px] text-text-muted font-medium">{progressRing.daysLeft === 1 ? 'day' : 'days'}</span>
+              </div>
             </div>
           )}
+
+          {/* Payday celebration */}
           {daysTilPay === 0 && (
-            <div className="inline-flex items-center gap-1.5 mt-2 bg-success-50 px-3 py-1 rounded-full">
-              <div className="w-1.5 h-1.5 rounded-full bg-success-500" />
-              <span className="text-[11px] text-success-700 font-semibold">
-                Payday!{effectivePayCycleName ? ` (${effectivePayCycleName})` : ''}
-              </span>
+            <div className="w-16 h-16 rounded-full bg-success-50 border-2 border-success-500 flex items-center justify-center shrink-0">
+              <span className="text-lg">🎉</span>
             </div>
           )}
         </div>
 
-        {/* Info cards */}
-        <div className="flex gap-2 mb-2">
-          <div className="flex-1 bg-surface-card rounded-[12px] border border-border px-3 py-2.5">
+        {/* Pay cycle name */}
+        {effectivePayCycleName && daysTilPay !== null && daysTilPay > 0 && (
+          <p className="text-[10px] text-text-muted -mt-2 mb-2">{effectivePayCycleName}'s payday</p>
+        )}
+
+        {/* Info cards — glassmorphic style */}
+        <div className="flex gap-2 mb-1">
+          <div className="flex-1 bg-white/70 rounded-[12px] border border-white/40 px-3 py-2.5 backdrop-blur-md">
             <p className="text-[10px] text-text-muted">Bank</p>
-            <p className="text-[14px] font-semibold mt-0.5">{formatCurrency(actualBalance)}</p>
+            <p className="text-[15px] font-bold mt-0.5">{formatCurrency(actualBalance)}</p>
           </div>
           {showAfterPayday && (
-            <div className="flex-1 bg-surface-card rounded-[12px] border border-border px-3 py-2.5">
+            <div className="flex-1 bg-white/70 rounded-[12px] border border-white/40 px-3 py-2.5 backdrop-blur-md">
               <p className="text-[10px] text-text-muted">After payday</p>
-              <p className={`text-[14px] font-semibold mt-0.5 ${afterPayday < 0 ? 'text-danger-500' : ''}`}>
+              <p className={`text-[15px] font-bold mt-0.5 ${afterPayday < 0 ? 'text-danger-500' : ''}`}>
                 {formatCurrency(afterPayday)}
               </p>
             </div>
@@ -356,6 +411,7 @@ export default function HomeScreen() {
             )}
 
             {/* Scheduled section */}
+                           {/* Scheduled section */}
             {allScheduled.length > 0 && !searchQuery && (
               <div className="mb-4">
                 <div className="flex items-center gap-1.5 mb-2 px-1">
@@ -364,33 +420,44 @@ export default function HomeScreen() {
                     Scheduled ({allScheduled.length})
                   </p>
                 </div>
+
                 {allScheduled.map((item) => {
                   if (item.isRecurringAuto) {
+                    const isIncome = item.type === 'income' || (!item.type && item.amount > 0);
                     return (
-                      <div key={item.id}
+                      <div
+                        key={item.id}
                         onClick={() => { setActionItem(item); setPostEarlyAmount(Math.abs(item.amount).toFixed(2)); }}
-                        className="flex items-center gap-3 py-3 px-1 border-b border-dashed border-border-light bg-brand-50/20 cursor-pointer select-none"
+                        className={`flex items-center gap-3 py-3 px-3 mb-1.5 rounded-[12px] cursor-pointer select-none border shadow-sm ${
+                          isIncome
+                            ? 'bg-emerald-50/70 border-emerald-100' 
+                            : 'bg-rose-50 border-rose-200'
+                        }`}
                       >
-                        <div className="w-9 h-9 rounded-[10px] flex items-center justify-center text-xs font-medium shrink-0"
-                          style={{ backgroundColor: '#4A8B3F10', color: '#4A8B3F', border: '1px dashed #4A8B3F40' }}>
-                          <CalendarClock size={14} />
+                        <div className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${
+                          isIncome ? 'bg-emerald-500/10 text-emerald-700' : 'bg-rose-500/10 text-rose-600'
+                        }`}>
+                          <CalendarClock size={18} />
                         </div>
+
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.description}</p>
-                          <p className="text-xs text-text-muted mt-0.5">
-                            Recurring · {item.date}
+                          <p className="text-sm font-semibold truncate">{item.description}</p>
+                          <p className="text-[11px] text-text-muted mt-0.5">
+                            {item.date}
                             {item.isApproximate && ' · Est.'}
                           </p>
-                          {(item.type === 'income' || (!item.type && item.amount > 0)) && (
-                            <p className="text-[9px] text-text-muted mt-0.5 italic">Not counted in TilPaid balance</p>
+                          {isIncome && (
+                            <p className="text-[9px] text-text-muted mt-0.5 italic">
+                              Not counted in TilPaid balance
+                            </p>
                           )}
                         </div>
+
                         <div className="text-right shrink-0">
-                          <p className={`text-sm font-medium ${item.type === 'income' ? 'text-success-500' : ''}`}>
+                          <p className={`text-[14px] font-bold ${
+                            isIncome ? 'text-emerald-700' : 'text-rose-600'
+                          }`}>
                             {formatCurrency(item.amount)}
-                            {item.isApproximate && (
-                              <span className="text-[9px] text-text-muted font-normal ml-1">est.</span>
-                            )}
                           </p>
                         </div>
                       </div>
@@ -398,26 +465,53 @@ export default function HomeScreen() {
                   }
                   return <TransactionCard key={item.id} transaction={item} isScheduled={true} />;
                 })}
+
                 <div className="border-b border-border mt-2 mb-3" />
               </div>
             )}
 
             {/* Recent section */}
-            <p className="text-xs text-text-secondary uppercase tracking-wider mb-2 px-1">
-              {searchQuery ? 'Search results' : 'Recent'}
-            </p>
-            {(() => {
-              const txList = searchQuery ? transactionsWithBalances : recentTransactions;
-              const filtered = txList.filter(tx => {
-                if (!searchQuery) return true;
-                return (tx.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-              });
-              return filtered.length === 0 ? (
-                <p className="text-xs text-text-muted text-center py-6">No matching transactions</p>
-              ) : (
-                filtered.map((tx) => <TransactionCard key={tx.id} transaction={tx} />)
-              );
-            })()}
+            <div className="mb-6">
+              <div className="flex items-center justify-between px-1 mb-3">
+                <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">
+                  {searchQuery ? 'Search results' : 'Recent'}
+                </p>
+                
+                {!searchQuery && recentTransactions.length > 4 && (
+                  <button 
+                    onClick={() => {/* TODO: navigate to full ledger */}}
+                    className="text-xs font-medium text-brand-600 flex items-center gap-1 hover:text-brand-700 transition-colors"
+                  >
+                    See all <span className="text-[10px]">→</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1">
+                {(() => {
+                  const txList = searchQuery ? transactionsWithBalances : recentTransactions;
+                  const filtered = txList.filter(tx => {
+                    if (!searchQuery) return true;
+                    return (tx.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+                  });
+
+                  return filtered.length === 0 ? (
+                    <p className="text-xs text-text-muted text-center py-8">
+                      No matching transactions
+                    </p>
+                  ) : (
+                    filtered.map((tx) => (
+                      <TransactionCard 
+                        key={tx.id} 
+                        transaction={tx} 
+                        compact={true}
+                      />
+                    ))
+                  );
+                })()}
+              </div>
+            </div>
+
             <StartingBalanceLine account={activeAccount} />
           </div>
         )}

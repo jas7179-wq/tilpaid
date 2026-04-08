@@ -4,7 +4,11 @@ import { ArrowUpDown, Pencil, Trash2, Lock } from 'lucide-react';
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function TransactionCard({ transaction, isScheduled = false }) {
+export default function TransactionCard({ 
+  transaction, 
+  isScheduled = false,
+  compact = false   // ← new prop for Recent section
+}) {
   const { categories, deleteTransactionById } = useApp();
   const navigate = useNavigate();
   const [showActions, setShowActions] = useState(false);
@@ -19,6 +23,7 @@ export default function TransactionCard({ transaction, isScheduled = false }) {
   const isPositive = transaction.amount > 0;
   const isLocked = transaction.isLocked || transaction.isPreAnchor;
 
+  // ... (all your existing touch handlers stay exactly the same)
   const handleTouchStart = useCallback(() => {
     touchMoved.current = false;
     isLongPress.current = false;
@@ -51,7 +56,6 @@ export default function TransactionCard({ transaction, isScheduled = false }) {
       return;
     }
 
-    // Short tap
     if (showActions) {
       setShowActions(false);
       setDeleteError('');
@@ -74,9 +78,12 @@ export default function TransactionCard({ transaction, isScheduled = false }) {
   return (
     <div>
       <div
-        className={`flex items-center gap-3 py-3 px-1 border-b border-border-light ${
-          transaction.isAdjustment ? 'opacity-65' : ''
-        } ${isLocked ? 'opacity-50' : ''} ${isScheduled ? 'bg-brand-50/30 border-dashed' : ''} select-none`}
+        className={`flex items-center gap-3 px-1 border-b border-border-light select-none
+          ${compact ? 'py-1.5' : 'py-3'}
+          ${transaction.isAdjustment ? 'opacity-65' : ''}
+          ${isLocked ? 'opacity-50' : ''}
+          ${isScheduled ? 'bg-brand-50/30 border-dashed' : ''}
+        `}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -173,7 +180,6 @@ export default function TransactionCard({ transaction, isScheduled = false }) {
         )}
       </div>
 
-      {/* Delete error message */}
       {deleteError && (
         <div className="px-2 py-1.5 mx-1 mb-1 bg-danger-50 rounded-lg">
           <p className="text-[11px] text-danger-700">{deleteError}</p>
