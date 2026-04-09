@@ -1033,6 +1033,11 @@ export default function SettingsScreen() {
         <div className="text-center text-xs text-text-muted py-6">
           <p>TilPaid v0.1.0</p>
           <p className="mt-1">Your data stays on this device</p>
+          <div className="flex justify-center gap-3 mt-2">
+            <button onClick={() => navigate('/privacy')} className="text-brand-500 font-medium">Privacy Policy</button>
+            <span>·</span>
+            <button onClick={() => navigate('/terms')} className="text-brand-500 font-medium">Terms of Service</button>
+          </div>
         </div>
       </div>
 

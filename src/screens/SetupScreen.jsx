@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { todayISO } from '../lib/utils';
 import { addDays, addWeeks, format } from 'date-fns';
@@ -18,6 +19,7 @@ const PAY_FREQUENCIES = [
 
 export default function SetupScreen() {
   const { completeSetup } = useApp();
+  const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [accountType, setAccountType] = useState('checking');
   const [balance, setBalance] = useState('');
@@ -62,6 +64,11 @@ export default function SetupScreen() {
         <p className="text-xs text-text-muted mt-8 text-center max-w-xs leading-relaxed">
           Your data stays on your device. Sign in later to unlock sync and premium features.
         </p>
+        <div className="flex justify-center gap-3 mt-3 text-[10px] text-text-muted">
+          <button onClick={() => navigate('/privacy')} className="text-brand-500 font-medium">Privacy</button>
+          <span>·</span>
+          <button onClick={() => navigate('/terms')} className="text-brand-500 font-medium">Terms</button>
+        </div>
       </div>
     );
   }
