@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, generateUpcomingOccurrences, todayISO, daysUntil, createTransaction, getNextPayInfo, generatePayCycleScheduledItems, advancePayCycleDate } from '../lib/utils';
+import { formatCurrency, generateUpcomingOccurrences, todayISO, daysUntil, createTransaction, getNextPayInfo, generatePayCycleScheduledItems, advancePayCycleDate, calculateEnvelopeStatus, getTotalEnvelopeRemaining } from '../lib/utils';
 import * as db from '../lib/db';
 import TransactionCard from '../components/TransactionCard';
 import StartingBalanceLine from '../components/StartingBalanceLine';
@@ -24,15 +24,38 @@ export default function HomeScreen() {
   const [recurringScheduled, setRecurringScheduled] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [warningThreshold, setWarningThreshold] = useState(250);
-  const [actionItem, setActionItem] = useState(null); // for recurring action sheet
+  const [actionItem, setActionItem] = useState(null);
   const [postEarlyAmount, setPostEarlyAmount] = useState('');
+  const [localCategories, setLocalCategories] = useState([]);
+  const [envelopeStatuses, setEnvelopeStatuses] = useState([]);
+  const [envelopeRemaining, setEnvelopeRemaining] = useState(0);
+  const [showEnvelopeDetail, setShowEnvelopeDetail] = useState(false);
 
   useEffect(() => {
     refreshTransactions();
     db.getSetting('warningThreshold').then(val => {
       if (val !== undefined) setWarningThreshold(val);
     });
+    db.getCategories().then(cats => setLocalCategories(cats));
   }, [refreshTransactions]);
+
+  // Calculate envelope statuses when transactions or account change
+  useEffect(() => {
+    if (!activeAccount || !isPremium || !activeAccount.envelopes?.length) {
+      setEnvelopeStatuses([]);
+      setEnvelopeRemaining(0);
+      return;
+    }
+    async function calcEnvelopes() {
+      const txs = await db.getTransactions(activeAccount.id);
+      const cats = await db.getCategories();
+      const statuses = calculateEnvelopeStatus(activeAccount, txs, cats);
+      const remaining = getTotalEnvelopeRemaining(activeAccount, txs, cats);
+      setEnvelopeStatuses(statuses);
+      setEnvelopeRemaining(Math.round(remaining * 100) / 100);
+    }
+    calcEnvelopes();
+  }, [activeAccount, isPremium, transactionsWithBalances]);
 
   const today = todayISO();
   const payDate = nextPayDate || null;
@@ -252,7 +275,7 @@ export default function HomeScreen() {
     return total;
   }, [allScheduled, effectivePayDate]);
 
-  const tilPaidBalance = Math.round((actualBalance + scheduledExpensesTotal) * 100) / 100;
+  const tilPaidBalance = Math.round((actualBalance + scheduledExpensesTotal - envelopeRemaining) * 100) / 100;
 
   // Balance pop animation
   const balanceRef = useRef(null);
@@ -467,6 +490,68 @@ export default function HomeScreen() {
                 })}
 
                 <div className="border-b border-border mt-2 mb-3" />
+              </div>
+            )}
+
+            {/* Envelope summary (Premium) */}
+            {isPremium && envelopeStatuses.length > 0 && !searchQuery && (
+              <div className="mb-4">
+                <div
+                  onClick={() => setShowEnvelopeDetail(!showEnvelopeDetail)}
+                  className="flex items-center justify-between py-2.5 px-3 rounded-[12px] bg-white cursor-pointer"
+                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08)' }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-[10px] bg-brand-50 flex items-center justify-center">
+                      <span className="text-[12px]">📊</span>
+                    </div>
+                    <div>
+                      <p className="text-[12px] font-semibold">Budget remaining</p>
+                      <p className="text-[10px] text-text-muted">{envelopeStatuses.length} envelope{envelopeStatuses.length > 1 ? 's' : ''} this cycle</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[14px] font-bold text-brand-600">-{formatCurrency(envelopeRemaining)}</p>
+                    <p className="text-[9px] text-text-muted">{showEnvelopeDetail ? 'tap to hide' : 'tap for detail'}</p>
+                  </div>
+                </div>
+
+                {/* Expandable detail */}
+                {showEnvelopeDetail && (
+                  <div className="mt-2 space-y-1.5">
+                    {envelopeStatuses.map(env => (
+                      <div key={env.id} className="bg-white rounded-[10px] px-3 py-2.5"
+                        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: env.categoryColor }} />
+                            <span className="text-[11px] font-semibold">{env.categoryName}{env.note ? ` · ${env.note}` : ''}</span>
+                          </div>
+                          <span className="text-[11px] text-text-muted">
+                            {formatCurrency(env.spent)} / {formatCurrency(env.budgeted)}
+                          </span>
+                        </div>
+                        {/* Progress bar */}
+                        <div className="h-1.5 rounded-full bg-border-light overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${
+                              env.percent >= 1 ? 'bg-danger-500' : env.percent >= 0.8 ? 'bg-warning-500' : 'bg-brand-500'
+                            }`}
+                            style={{ width: `${Math.min(100, env.percent * 100)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          <span className={`text-[9px] font-medium ${env.overspent > 0 ? 'text-danger-500' : 'text-text-muted'}`}>
+                            {env.overspent > 0 ? `Over by ${formatCurrency(env.overspent)}` : `${formatCurrency(env.remaining)} left`}
+                          </span>
+                          <span className="text-[9px] text-text-muted">{Math.round(env.percent * 100)}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="border-b border-border mt-3 mb-3" />
               </div>
             )}
 

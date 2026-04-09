@@ -436,3 +436,98 @@ export function generateUpcomingOccurrences(recurring, lookAheadDays = 35) {
 
   return occurrences;
 }
+
+// ── Envelope / Budget Helpers ──
+
+// Get the start date of the current pay cycle (last payday)
+export function getCurrentCycleStart(account) {
+  const cycles = account.payCycles || [];
+  if (cycles.length === 0 && account.payFrequency && account.nextPayDate) {
+    cycles.push({ frequency: account.payFrequency, nextPayDate: account.nextPayDate });
+  }
+  if (cycles.length === 0) return null;
+
+  // Use the nearest next pay date to work backward
+  const cycle = cycles.sort((a, b) => (a.nextPayDate || '').localeCompare(b.nextPayDate || ''))[0];
+  if (!cycle?.nextPayDate || !cycle?.frequency) return null;
+
+  const nextPay = new Date(cycle.nextPayDate + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // If today IS payday, the new cycle starts today
+  if (nextPay.getTime() === today.getTime()) {
+    return todayISO();
+  }
+
+  // If nextPayDate is in the future, walk backward one cycle from it
+  // That gives us the most recent payday (start of current cycle)
+  let cycleStart = new Date(nextPay);
+  switch (cycle.frequency) {
+    case 'weekly': cycleStart.setDate(cycleStart.getDate() - 7); break;
+    case 'biweekly': cycleStart.setDate(cycleStart.getDate() - 14); break;
+    case 'semi-monthly': {
+      const d = cycleStart.getDate();
+      if (d <= 1) { cycleStart.setMonth(cycleStart.getMonth() - 1); cycleStart.setDate(15); }
+      else if (d <= 15) { cycleStart.setDate(1); }
+      else { cycleStart.setDate(15); }
+      break;
+    }
+    case 'monthly': cycleStart.setMonth(cycleStart.getMonth() - 1); break;
+    default: cycleStart.setDate(cycleStart.getDate() - 14);
+  }
+
+  return cycleStart.toISOString().split('T')[0];
+}
+
+// Calculate envelope status for an account
+// Returns array of { categoryId, categoryName, budgeted, spent, remaining, percent }
+export function calculateEnvelopeStatus(account, transactions, categories) {
+  const envelopes = account.envelopes || [];
+  if (envelopes.length === 0) return [];
+
+  const cycleStart = getCurrentCycleStart(account);
+  const today = todayISO();
+
+  return envelopes
+    .filter(env => env.isActive)
+    .map(env => {
+      const cat = categories.find(c => c.id === env.categoryId);
+
+      // Sum spending in this category since cycle start
+      const spent = transactions
+        .filter(tx => {
+          if (tx.isAdjustment) return false;
+          if (tx.categoryId !== env.categoryId) return false;
+          if (tx.amount >= 0) return false; // only expenses
+          if (cycleStart && tx.date < cycleStart) return false;
+          if (tx.date > today) return false;
+          return true;
+        })
+        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+
+      const budgeted = env.amount;
+      const remaining = Math.max(0, budgeted - spent);
+      const overspent = spent > budgeted ? spent - budgeted : 0;
+      const percent = budgeted > 0 ? Math.min(1, spent / budgeted) : 0;
+
+      return {
+        id: env.id,
+        categoryId: env.categoryId,
+        categoryName: cat?.name || 'Unknown',
+        categoryColor: cat?.color || '#6B7280',
+        note: env.note || '',
+        budgeted,
+        spent: Math.round(spent * 100) / 100,
+        remaining: Math.round(remaining * 100) / 100,
+        overspent: Math.round(overspent * 100) / 100,
+        percent,
+      };
+    });
+}
+
+// Total remaining across all envelopes (what user still expects to spend)
+export function getTotalEnvelopeRemaining(account, transactions, categories) {
+  const statuses = calculateEnvelopeStatus(account, transactions, categories);
+  return statuses.reduce((sum, s) => sum + s.remaining, 0);
+}

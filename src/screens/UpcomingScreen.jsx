@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { formatCurrency, formatDate, daysUntil, generateUpcomingOccurrences, todayISO, createTransaction, generatePayCycleScheduledItems, advancePayCycleDate } from '../lib/utils';
+import { formatCurrency, formatDate, daysUntil, generateUpcomingOccurrences, todayISO, createTransaction, generatePayCycleScheduledItems, advancePayCycleDate, calculateEnvelopeStatus } from '../lib/utils';
 import * as db from '../lib/db';
 import BottomNav from '../components/BottomNav';
 import { Plus, Trash2, Calendar, Repeat, AlertTriangle, Check, X, Clock, CalendarDays, ListFilter } from 'lucide-react';
@@ -16,6 +16,7 @@ export default function UpcomingScreen() {
   const [categories, setCategories] = useState([]);
   const [showTab, setShowTab] = useState('upcoming');
   const [filterAccountId, setFilterAccountId] = useState('all');
+  const [envelopeStatuses, setEnvelopeStatuses] = useState([]);
 
   // Verify modal state
   const [verifyItem, setVerifyItem] = useState(null);
@@ -24,6 +25,27 @@ export default function UpcomingScreen() {
   useEffect(() => {
     loadData();
   }, [accounts]);
+
+  // Load envelope data
+  useEffect(() => {
+    async function loadEnvelopes() {
+      if (!isPremium || !accounts.length) { setEnvelopeStatuses([]); return; }
+      const cats = await db.getCategories();
+      const relevantAccounts = filterAccountId === 'all'
+        ? accounts
+        : accounts.filter(a => a.id === filterAccountId);
+
+      const allStatuses = [];
+      for (const acc of relevantAccounts) {
+        if (!acc.envelopes?.length) continue;
+        const txs = await db.getTransactions(acc.id);
+        const statuses = calculateEnvelopeStatus(acc, txs, cats);
+        allStatuses.push(...statuses);
+      }
+      setEnvelopeStatuses(allStatuses);
+    }
+    loadEnvelopes();
+  }, [accounts, isPremium, filterAccountId, upcomingItems]);
 
   async function loadData() {
     if (!accounts.length) return;
@@ -295,9 +317,9 @@ export default function UpcomingScreen() {
 
       <div className="flex-1 px-5 pt-4">
         {/* Tabs */}
-        <div className="flex border-b border-border-light mb-4">
+        <div className="flex border-b border-border-light mb-4 overflow-x-auto">
           <button onClick={() => setShowTab('upcoming')}
-            className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex-1 py-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
               showTab === 'upcoming' ? 'border-brand-500 text-brand-600' : 'border-transparent text-text-muted'
             }`}>
             List
@@ -307,16 +329,24 @@ export default function UpcomingScreen() {
               </span>
             )}
           </button>
+          {isPremium && envelopeStatuses.length > 0 && (
+            <button onClick={() => setShowTab('envelopes')}
+              className={`flex-1 py-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
+                showTab === 'envelopes' ? 'border-brand-500 text-brand-600' : 'border-transparent text-text-muted'
+              }`}>
+              Budget
+            </button>
+          )}
           <button onClick={() => isPremium ? setShowTab('calendar') : null}
-            className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex-1 py-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
               showTab === 'calendar' ? 'border-brand-500 text-brand-600' : 'border-transparent text-text-muted'
             } ${!isPremium ? 'opacity-40' : ''}`}>
             Calendar {!isPremium && <span className="text-[8px] align-top">PRO</span>}
           </button>
           <button onClick={() => setShowTab('manage')}
-            className={`flex-1 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex-1 py-2.5 text-[13px] font-medium border-b-2 transition-colors whitespace-nowrap ${
               showTab === 'manage' ? 'border-brand-500 text-brand-600' : 'border-transparent text-text-muted'
-            }`}>Manage ({filteredRecurring.length})</button>
+            }`}>Manage</button>
         </div>
 
         {/* Upcoming tab */}
@@ -420,6 +450,98 @@ export default function UpcomingScreen() {
                   })}
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* Envelopes tab */}
+        {showTab === 'envelopes' && (
+          <div>
+            {envelopeStatuses.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-sm text-text-muted">No envelopes set up</p>
+                <button onClick={() => navigate('/settings')} className="mt-3 text-sm text-brand-500 font-medium">
+                  Set up in Settings
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Summary header */}
+                <div className="bg-white rounded-[14px] px-4 py-3"
+                  style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08)' }}>
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[11px] text-text-muted">Total budgeted</p>
+                      <p className="text-lg font-bold">{formatCurrency(envelopeStatuses.reduce((s, e) => s + e.budgeted, 0))}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[11px] text-text-muted">Spent so far</p>
+                      <p className="text-lg font-bold text-danger-500">{formatCurrency(envelopeStatuses.reduce((s, e) => s + e.spent, 0))}</p>
+                    </div>
+                  </div>
+                  {/* Overall progress */}
+                  <div className="h-2 rounded-full bg-border-light overflow-hidden mt-3">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        (() => {
+                          const totalBudgeted = envelopeStatuses.reduce((s, e) => s + e.budgeted, 0);
+                          const totalSpent = envelopeStatuses.reduce((s, e) => s + e.spent, 0);
+                          const pct = totalBudgeted > 0 ? totalSpent / totalBudgeted : 0;
+                          return pct >= 1 ? 'bg-danger-500' : pct >= 0.8 ? 'bg-warning-500' : 'bg-brand-500';
+                        })()
+                      }`}
+                      style={{ width: `${Math.min(100, (() => {
+                        const totalBudgeted = envelopeStatuses.reduce((s, e) => s + e.budgeted, 0);
+                        const totalSpent = envelopeStatuses.reduce((s, e) => s + e.spent, 0);
+                        return totalBudgeted > 0 ? (totalSpent / totalBudgeted) * 100 : 0;
+                      })())}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-text-muted mt-1.5 text-right">
+                    {formatCurrency(envelopeStatuses.reduce((s, e) => s + e.remaining, 0))} remaining this cycle
+                  </p>
+                </div>
+
+                {/* Per-category cards */}
+                {envelopeStatuses.map(env => (
+                  <div key={env.id} className="bg-white rounded-[14px] px-4 py-3"
+                    style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08)' }}>
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-[10px] flex items-center justify-center text-[11px] font-bold"
+                          style={{ backgroundColor: `${env.categoryColor}15`, color: env.categoryColor }}>
+                          {env.categoryName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-semibold">{env.categoryName}</p>
+                          {env.note && <p className="text-[9px] text-text-muted">{env.note}</p>}
+                          <p className="text-[10px] text-text-muted">
+                            {formatCurrency(env.spent)} of {formatCurrency(env.budgeted)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {env.overspent > 0 ? (
+                          <p className="text-[13px] font-bold text-danger-500">+{formatCurrency(env.overspent)}</p>
+                        ) : (
+                          <p className="text-[13px] font-bold text-brand-600">{formatCurrency(env.remaining)}</p>
+                        )}
+                        <p className="text-[9px] text-text-muted">{env.overspent > 0 ? 'over budget' : 'left'}</p>
+                      </div>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="h-2 rounded-full bg-border-light overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          env.percent >= 1 ? 'bg-danger-500' : env.percent >= 0.8 ? 'bg-warning-500' : 'bg-brand-500'
+                        }`}
+                        style={{ width: `${Math.min(100, env.percent * 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-[9px] text-text-muted mt-1 text-right">{Math.round(env.percent * 100)}% used</p>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

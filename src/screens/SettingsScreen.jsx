@@ -63,6 +63,10 @@ export default function SettingsScreen() {
   const [localAccountName, setLocalAccountName] = useState('');
   const [localPayCycles, setLocalPayCycles] = useState([]);
 
+  // Envelope editing state
+  const [localEnvelopes, setLocalEnvelopes] = useState([]);
+  const [showEnvelopeEditor, setShowEnvelopeEditor] = useState(false);
+
   // Reset state
   const [showReset, setShowReset] = useState(false);
   const [resetBalance, setResetBalance] = useState('');
@@ -279,6 +283,51 @@ export default function SettingsScreen() {
   const removePayCycle = (cycleId) => {
     setLocalPayCycles(prev => prev.filter(c => c.id !== cycleId));
   };
+
+  // Envelope functions
+  const loadEnvelopes = () => {
+    const envs = activeAccount?.envelopes || [];
+    setLocalEnvelopes([...envs]);
+    setShowEnvelopeEditor(true);
+  };
+
+  const addEnvelope = () => {
+    setLocalEnvelopes(prev => [...prev, {
+      id: generateId().slice(0, 8),
+      categoryId: '',
+      amount: '',
+      note: '',
+      isActive: true,
+    }]);
+  };
+
+  const updateEnvelope = (envId, field, value) => {
+    setLocalEnvelopes(prev => prev.map(e =>
+      e.id === envId ? { ...e, [field]: value } : e
+    ));
+  };
+
+  const removeEnvelope = (envId) => {
+    setLocalEnvelopes(prev => prev.filter(e => e.id !== envId));
+  };
+
+  const saveEnvelopes = async () => {
+    if (!activeAccount) return;
+    const cleaned = localEnvelopes
+      .filter(e => e.categoryId && e.amount)
+      .map(({ amountInput, ...rest }) => ({
+        ...rest,
+        amount: typeof rest.amount === 'string' ? parseFloat(rest.amount) || 0 : rest.amount,
+      }));
+
+    const updated = { ...activeAccount, envelopes: cleaned, updatedAt: Date.now() };
+    await db.saveAccount(updated);
+    setShowEnvelopeEditor(false);
+    window.location.reload();
+  };
+
+  // Get expense categories for envelope picker (exclude income and "other")
+  const expenseCategories = categories.filter(c => !c.isIncome && c.id !== 'cat-other');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-surface to-white px-5 py-5 overflow-x-hidden">
@@ -591,6 +640,119 @@ export default function SettingsScreen() {
               )}
             </div>
           ))}
+        </div>
+
+               {/* Budget Envelopes (Premium) */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-3">
+            <p className="text-xs text-text-secondary uppercase tracking-wider">Budget Envelopes</p>
+            {isPremium ? (
+              <button onClick={loadEnvelopes}
+                className="flex items-center gap-1.5 text-xs font-medium px-4 py-2 rounded-2xl bg-brand-50 text-brand-600 border border-brand-200 hover:bg-brand-100 transition-colors">
+                <Pencil size={10} /> Edit
+              </button>
+            ) : (
+              <span className="text-[10px] text-brand-500 font-medium bg-brand-50 px-2 py-1 rounded-full">Premium</span>
+            )}
+          </div>
+
+          {!isPremium ? (
+            <div className="bg-white rounded-2xl border border-border-light p-5 text-center">
+              <p className="text-sm text-text-secondary mb-1">Set spending limits by category</p>
+              <p className="text-[11px] text-text-muted">Track groceries, dining, gas and more against your budget each pay cycle.</p>
+            </div>
+          ) : showEnvelopeEditor ? (
+            <div className="bg-white rounded-2xl border border-border-light p-4">
+              <p className="text-[11px] text-text-muted mb-3">Set a budget per category. Resets each pay cycle.</p>
+
+              {localEnvelopes.length === 0 && (
+                <p className="text-[11px] text-text-muted text-center py-3">No envelopes yet. Tap "Add" below.</p>
+              )}
+
+              {localEnvelopes.map((env, idx) => (
+                <div key={env.id} className="bg-surface rounded-[12px] border border-border-light p-3 mb-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] text-text-muted uppercase tracking-wider">Envelope {idx + 1}</span>
+                    <button onClick={() => removeEnvelope(env.id)}
+                      className="text-[10px] text-danger-500 font-medium">Remove</button>
+                  </div>
+
+                  {/* Category picker */}
+                  <select
+                    value={env.categoryId}
+                    onChange={(e) => updateEnvelope(env.id, 'categoryId', e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-lg border border-border bg-surface-card text-xs mb-2 focus:outline-none focus:border-brand-500 box-border"
+                  >
+                    <option value="">Select category...</option>
+                    {expenseCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}
+                        disabled={localEnvelopes.some(e => e.id !== env.id && e.categoryId === cat.id)}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Amount */}
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <span className="text-xs text-text-muted">$</span>
+                    <input type="text" inputMode="decimal"
+                      placeholder="Budget per cycle"
+                      value={env.amountInput !== undefined ? env.amountInput : (env.amount || '')}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                          updateEnvelope(env.id, 'amountInput', val);
+                          updateEnvelope(env.id, 'amount', val ? parseFloat(val) || '' : '');
+                        }
+                      }}
+                      className="flex-1 px-2.5 py-2 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border" />
+                  </div>
+
+                  {/* Note */}
+                  <input type="text"
+                    placeholder="Description (e.g. Electric, Gas, Cable)"
+                    value={env.note || ''}
+                    onChange={(e) => updateEnvelope(env.id, 'note', e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border" />
+                </div>
+              ))}
+
+              <div className="flex gap-2 mt-3">
+                <button onClick={addEnvelope}
+                  className="flex-1 py-2 rounded-[10px] border border-brand-200 text-xs font-medium text-brand-600 bg-brand-50">
+                  + Add envelope
+                </button>
+                <button onClick={saveEnvelopes}
+                  className="flex-1 py-2 rounded-[10px] bg-brand-500 text-white text-xs font-medium">
+                  Save
+                </button>
+              </div>
+              <button onClick={() => setShowEnvelopeEditor(false)}
+                className="w-full mt-2 py-1.5 text-[11px] text-text-muted text-center">Cancel</button>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-border-light p-4">
+              {(activeAccount?.envelopes || []).filter(e => e.isActive).length === 0 ? (
+                <p className="text-[11px] text-text-muted text-center py-2">No envelopes set up. Tap Edit to create your first budget.</p>
+              ) : (
+                <div className="space-y-2">
+                  {(activeAccount?.envelopes || []).filter(e => e.isActive).map(env => {
+                    const cat = categories.find(c => c.id === env.categoryId);
+                    return (
+                      <div key={env.id} className="flex items-center gap-3">
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat?.color || '#6B7280' }} />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-medium">{cat?.name || 'Unknown'}</span>
+                          {env.note && <span className="text-[10px] text-text-muted ml-1">({env.note})</span>}
+                        </div>
+                        <span className="text-xs text-text-secondary font-semibold shrink-0">{formatCurrency(env.amount)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
                {/* Categories */}

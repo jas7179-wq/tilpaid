@@ -18,7 +18,7 @@ export default function AddRecurringScreen() {
   const { categories, accounts, activeAccountId } = useApp();
   const navigate = useNavigate();
 
-  const [type, setType] = useState('expense');
+  const [type] = useState('expense');
   const [amount, setAmount] = useState('0.00');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -31,14 +31,7 @@ export default function AddRecurringScreen() {
   const [selectedAccountId, setSelectedAccountId] = useState(activeAccountId);
   const [error, setError] = useState('');
 
-  const filteredCats = categories.filter((c) => {
-    if (type === 'income') return c.isIncome || c.id === 'cat-other';
-    return !c.isIncome;
-  }).sort((a, b) => {
-    if (a.id === 'cat-paycheck') return -1;
-    if (b.id === 'cat-paycheck') return 1;
-    return 0;
-  });
+  const filteredCats = categories.filter((c) => !c.isIncome);
 
   const handleSave = async () => {
     setError('');
@@ -82,21 +75,14 @@ export default function AddRecurringScreen() {
 
       {/* Amount */}
       <div className="mb-5">
-        <AmountInput value={amount} onChange={setAmount} type={type} autoFocus={true} />
-        <div className="flex gap-3 justify-center mt-4">
-          <button
-            onClick={() => { setType('expense'); setCategoryId(''); }}
-            className={`px-7 py-2.5 rounded-full text-sm font-medium transition-colors ${
-              type === 'expense' ? 'bg-danger-500 text-white' : 'border border-border text-text-secondary'
-            }`}
-          >Bill</button>
-          <button
-            onClick={() => { setType('income'); setCategoryId(''); }}
-            className={`px-7 py-2.5 rounded-full text-sm font-medium transition-colors ${
-              type === 'income' ? 'bg-success-500 text-white' : 'border border-border text-text-secondary'
-            }`}
-          >Deposit</button>
-        </div>
+        <AmountInput value={amount} onChange={setAmount} type="expense" autoFocus={true} />
+      </div>
+
+      {/* Paycheck hint */}
+      <div className="mb-4 px-1">
+        <p className="text-[10px] text-text-muted text-center">
+          Adding a paycheck? Set it up in <span className="text-brand-500 font-medium cursor-pointer" onClick={() => navigate('/settings')}>Settings → Pay Cycles</span>
+        </p>
       </div>
 
       {/* Description */}
@@ -104,7 +90,7 @@ export default function AddRecurringScreen() {
         <label className="text-xs text-text-secondary block mb-1.5">Description</label>
         <input
           type="text"
-          placeholder={type === 'income' ? 'e.g. Paycheck, Salary...' : 'e.g. Rent, AT&T, Netflix...'}
+          placeholder="e.g. Rent, AT&T, Netflix..."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="w-full px-4 py-3 rounded-[10px] border border-border bg-surface-card text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"

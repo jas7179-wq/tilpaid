@@ -59,10 +59,6 @@ export default function EditRecurringScreen() {
   const filteredCats = categories.filter((c) => {
     if (type === 'income') return c.isIncome || c.id === 'cat-other';
     return !c.isIncome;
-  }).sort((a, b) => {
-    if (a.id === 'cat-paycheck') return -1;
-    if (b.id === 'cat-paycheck') return 1;
-    return 0;
   });
 
   const handleSave = async () => {
@@ -124,20 +120,13 @@ export default function EditRecurringScreen() {
       {/* Amount */}
       <div className="mb-5">
         <AmountInput value={amount} onChange={setAmount} type={type} autoFocus={false} />
-        <div className="flex gap-3 justify-center mt-4">
-          <button
-            onClick={() => { setType('expense'); if (categoryId === 'cat-income') setCategoryId(''); }}
-            className={`px-7 py-2.5 rounded-full text-sm font-medium transition-colors ${
-              type === 'expense' ? 'bg-danger-500 text-white' : 'border border-border text-text-secondary'
-            }`}
-          >Bill</button>
-          <button
-            onClick={() => { setType('income'); setCategoryId(''); }}
-            className={`px-7 py-2.5 rounded-full text-sm font-medium transition-colors ${
-              type === 'income' ? 'bg-success-500 text-white' : 'border border-border text-text-secondary'
-            }`}
-          >Deposit</button>
-        </div>
+        {type === 'income' && (
+          <div className="mt-3 px-1">
+            <p className="text-[10px] text-text-muted text-center">
+              Manage paychecks in <span className="text-brand-500 font-medium cursor-pointer" onClick={() => navigate('/settings')}>Settings → Pay Cycles</span>
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Description */}
