@@ -362,12 +362,12 @@ export default function LandingPage() {
               <span className="text-text">Til</span><span className="text-success-600">Paid</span>
             </span>
           </div>
-          <p className="text-[11px] text-text-muted">Midline Digital LLC</p>
+          <p className="text-[11px] text-text-muted">© 2026 Midline Digital LLC</p>
         </div>
         <div className="flex gap-4 mt-3">
-          <a href="#" className="text-[11px] text-text-muted hover:text-text-secondary">Privacy Policy</a>
-          <a href="#" className="text-[11px] text-text-muted hover:text-text-secondary">Terms of Service</a>
-          <a href="#" className="text-[11px] text-text-muted hover:text-text-secondary">Contact</a>
+          <a href="/privacy" className="text-[11px] text-text-muted hover:text-text-secondary">Privacy Policy</a>
+          <a href="/terms" className="text-[11px] text-text-muted hover:text-text-secondary">Terms of Service</a>
+          <a href="mailto:support@tilpaid.app" className="text-[11px] text-text-muted hover:text-text-secondary">Contact</a>
         </div>
       </footer>
     </div>
