@@ -17,6 +17,7 @@
     "@capacitor/ios": "^8.3.0",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
+    "@revenuecat/purchases-capacitor": "^12.3.2",
     "date-fns": "^4.1.0",
     "idb": "^8.0.3",
     "lucide-react": "^0.577.0",

@@ -17,7 +17,7 @@ const PAY_FREQUENCIES = [
 ];
 
 export default function AddAccountScreen() {
-  const { addNewAccount, canAddAccount } = useApp();
+  const { addNewAccount, canAddAccount, isPremium } = useApp();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -25,6 +25,7 @@ export default function AddAccountScreen() {
   const [balance, setBalance] = useState('');
   const [payFrequency, setPayFrequency] = useState('');
   const [nextPayDate, setNextPayDate] = useState('');
+  const [payAmount, setPayAmount] = useState('');
   const [error, setError] = useState('');
 
   const selectedLabel = ACCOUNT_TYPES.find(t => t.type === accountType)?.label || '';
@@ -49,6 +50,7 @@ export default function AddAccountScreen() {
       balance,
       payFrequency: showPaySettings ? payFrequency : null,
       nextPayDate: showPaySettings ? nextPayDate : null,
+      payAmount: showPaySettings ? payAmount : null,
     });
 
     if (result?.error) {
@@ -170,6 +172,35 @@ export default function AddAccountScreen() {
                 style={{ maxWidth: '100%' }}
               />
             </div>
+          )}
+
+          {/* Paycheck amount (Premium) */}
+          {payFrequency && isPremium && (
+            <div className="mt-3">
+              <label className="text-xs text-text-secondary block mb-1.5">Paycheck amount (optional)</label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-text-muted">$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="Auto-schedule paycheck"
+                  value={payAmount}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                      setPayAmount(val);
+                    }
+                  }}
+                  className="flex-1 px-4 py-3 rounded-[10px] border border-border bg-surface-card text-sm focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"
+                />
+              </div>
+              <p className="text-[10px] text-text-muted mt-1">Auto-schedules your paycheck each cycle</p>
+            </div>
+          )}
+          {payFrequency && !isPremium && (
+            <p className="text-[10px] text-brand-500 font-medium mt-2">
+              Premium: auto-schedule paychecks with amount
+            </p>
           )}
 
           <p className="text-[10px] text-text-muted mt-1.5">

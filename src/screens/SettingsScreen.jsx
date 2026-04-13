@@ -21,6 +21,12 @@ const PAY_FREQUENCIES = [
   { value: 'monthly', label: 'Monthly' },
 ];
 
+const RESET_DURATIONS = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+];
+
 const ACCOUNT_TYPES = [
   { type: 'checking', label: 'Checking' },
   { type: 'savings', label: 'Savings' },
@@ -286,18 +292,27 @@ export default function SettingsScreen() {
 
   // Envelope functions
   const loadEnvelopes = () => {
-    const envs = activeAccount?.envelopes || [];
+    const envs = (activeAccount?.envelopes || []).map(e => ({
+      ...e,
+      resetType: e.resetType || 'duration',
+      resetValue: e.resetValue || 'monthly',
+    }));
     setLocalEnvelopes([...envs]);
     setShowEnvelopeEditor(true);
   };
 
   const addEnvelope = () => {
+    // Default to first pay cycle if one exists, otherwise monthly duration
+    const defaultCycles = activeAccount?.payCycles || [];
+    const hasPayCycles = defaultCycles.length > 0;
     setLocalEnvelopes(prev => [...prev, {
       id: generateId().slice(0, 8),
       categoryId: '',
       amount: '',
       note: '',
       isActive: true,
+      resetType: hasPayCycles ? 'cycle' : 'duration',  // 'cycle' or 'duration'
+      resetValue: hasPayCycles ? defaultCycles[0].id : 'monthly',  // cycle id or duration value
     }]);
   };
 
@@ -318,6 +333,8 @@ export default function SettingsScreen() {
       .map(({ amountInput, ...rest }) => ({
         ...rest,
         amount: typeof rest.amount === 'string' ? parseFloat(rest.amount) || 0 : rest.amount,
+        resetType: rest.resetType || 'duration',
+        resetValue: rest.resetValue || 'monthly',
       }));
 
     const updated = { ...activeAccount, envelopes: cleaned, updatedAt: Date.now() };
@@ -432,7 +449,7 @@ export default function SettingsScreen() {
             {canAddAccount && (
               <button onClick={() => navigate('/add-account')}
                 className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-brand-50 text-brand-600 border border-brand-200">
-                <Plus size={12} /> Add
+                <Plus size={12} /> New Account
               </button>
             )}
           </div>
@@ -621,7 +638,7 @@ export default function SettingsScreen() {
                   <div className="flex gap-2 mt-2 pt-2 border-t border-border-light">
                     <button onClick={() => startEditingAccount(account)}
                       className="flex items-center gap-1 text-[11px] text-brand-500 font-medium">
-                      <Pencil size={10} /> Edit
+                      <Pencil size={10} /> Manage
                     </button>
                     {accounts.length > 1 && account.id !== activeAccount?.id && (
                       <button onClick={() => openConfirm({
@@ -663,7 +680,7 @@ export default function SettingsScreen() {
             </div>
           ) : showEnvelopeEditor ? (
             <div className="bg-white rounded-2xl border border-border-light p-4">
-              <p className="text-[11px] text-text-muted mb-3">Set a budget per category. Resets each pay cycle.</p>
+              <p className="text-[11px] text-text-muted mb-3">Set a budget per category. Choose when each envelope resets.</p>
 
               {localEnvelopes.length === 0 && (
                 <p className="text-[11px] text-text-muted text-center py-3">No envelopes yet. Tap "Add" below.</p>
@@ -692,11 +709,18 @@ export default function SettingsScreen() {
                     ))}
                   </select>
 
+                  {/* Note / description */}
+                  <input type="text"
+                    placeholder="Note (optional)"
+                    value={env.note || ''}
+                    onChange={(e) => updateEnvelope(env.id, 'note', e.target.value)}
+                    className="w-full px-2.5 py-2 rounded-lg border border-border bg-surface-card text-xs mb-2 focus:outline-none focus:border-brand-500 box-border" />
+
                   {/* Amount */}
                   <div className="flex items-center gap-1.5 mb-2">
                     <span className="text-xs text-text-muted">$</span>
                     <input type="text" inputMode="decimal"
-                      placeholder="Budget per cycle"
+                      placeholder="Budget per period"
                       value={env.amountInput !== undefined ? env.amountInput : (env.amount || '')}
                       onChange={(e) => {
                         const val = e.target.value;
@@ -708,12 +732,76 @@ export default function SettingsScreen() {
                       className="flex-1 px-2.5 py-2 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border" />
                   </div>
 
-                  {/* Note */}
-                  <input type="text"
-                    placeholder="Description (e.g. Electric, Gas, Cable)"
-                    value={env.note || ''}
-                    onChange={(e) => updateEnvelope(env.id, 'note', e.target.value)}
-                    className="w-full px-2.5 py-2 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border" />
+                  {/* Reset period */}
+                  <div className="mb-2">
+                    <label className="text-[10px] text-text-muted block mb-1">Resets every</label>
+                    <div className="flex gap-1.5 mb-1.5">
+                      <button
+                        onClick={() => {
+                          const cycles = activeAccount?.payCycles || [];
+                          updateEnvelope(env.id, 'resetType', 'cycle');
+                          updateEnvelope(env.id, 'resetValue', cycles[0]?.id || '');
+                        }}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] font-medium transition-colors ${
+                          env.resetType === 'cycle'
+                            ? 'bg-brand-50 border-[1.5px] border-brand-500 text-brand-700'
+                            : 'border border-border text-text-secondary'
+                        }`}>Pay cycle</button>
+                      <button
+                        onClick={() => {
+                          updateEnvelope(env.id, 'resetType', 'duration');
+                          updateEnvelope(env.id, 'resetValue', 'monthly');
+                        }}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[10px] font-medium transition-colors ${
+                          env.resetType === 'duration'
+                            ? 'bg-brand-50 border-[1.5px] border-brand-500 text-brand-700'
+                            : 'border border-border text-text-secondary'
+                        }`}>Fixed period</button>
+                    </div>
+
+                    {env.resetType === 'cycle' ? (
+                      <select
+                        value={env.resetValue || ''}
+                        onChange={(e) => updateEnvelope(env.id, 'resetValue', e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border"
+                      >
+                        <option value="">Select pay cycle...</option>
+                        {(activeAccount?.payCycles || []).map((cycle, idx) => {
+                          const freqLabel = PAY_FREQUENCIES.find(p => p.value === cycle.frequency)?.label || cycle.frequency;
+                          const displayName = cycle.name
+                            ? `${cycle.name} (${freqLabel})`
+                            : `Cycle ${idx + 1} — ${freqLabel}`;
+                          return (
+                            <option key={cycle.id} value={cycle.id}>
+                              {displayName}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    ) : (
+                      <div>
+                        <div className="flex gap-1 mb-1.5">
+                          {RESET_DURATIONS.map(d => (
+                            <button key={d.value}
+                              onClick={() => updateEnvelope(env.id, 'resetValue', d.value)}
+                              className={`flex-1 py-1.5 px-1.5 rounded-lg text-[10px] font-medium transition-colors ${
+                                env.resetValue === d.value
+                                  ? 'bg-brand-50 border-[1.5px] border-brand-500 text-brand-700'
+                                  : 'border border-border text-text-secondary'
+                              }`}>{d.label}</button>
+                          ))}
+                        </div>
+                        <label className="text-[9px] text-text-muted block mb-0.5">Next reset date</label>
+                        <input type="date"
+                          value={env.resetDate || ''}
+                          onChange={(e) => updateEnvelope(env.id, 'resetDate', e.target.value)}
+                          onFocus={(e) => { try { e.target.showPicker(); } catch {} }}
+                          onClick={(e) => { try { e.target.showPicker(); } catch {} }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface-card text-xs focus:outline-none focus:border-brand-500 box-border appearance-none"
+                          style={{ maxWidth: '100%' }} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
 
@@ -738,12 +826,19 @@ export default function SettingsScreen() {
                 <div className="space-y-2">
                   {(activeAccount?.envelopes || []).filter(e => e.isActive).map(env => {
                     const cat = categories.find(c => c.id === env.categoryId);
+                    const resetLabel = env.resetType === 'cycle'
+                      ? (() => {
+                          const cycle = (activeAccount?.payCycles || []).find(c => c.id === env.resetValue);
+                          return cycle?.name || PAY_FREQUENCIES.find(p => p.value === cycle?.frequency)?.label || '';
+                        })()
+                      : RESET_DURATIONS.find(d => d.value === env.resetValue)?.label || '';
                     return (
                       <div key={env.id} className="flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat?.color || '#6B7280' }} />
                         <div className="flex-1 min-w-0">
                           <span className="text-xs font-medium">{cat?.name || 'Unknown'}</span>
                           {env.note && <span className="text-[10px] text-text-muted ml-1">({env.note})</span>}
+                          {resetLabel && <span className="text-[9px] text-text-muted ml-1">· {resetLabel}</span>}
                         </div>
                         <span className="text-xs text-text-secondary font-semibold shrink-0">{formatCurrency(env.amount)}</span>
                       </div>
@@ -984,49 +1079,6 @@ export default function SettingsScreen() {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Dev tools — remove before production */}
-        <div className="mb-6">
-          <p className="text-xs text-text-secondary uppercase tracking-wider mb-2">Developer tools</p>
-          <div className="bg-surface-card rounded-[10px] border border-border divide-y divide-border-light overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">Premium mode</p>
-                <p className="text-xs text-text-muted">Toggle to test premium features</p>
-              </div>
-              <button
-                onClick={async () => {
-                  const newVal = !isPremium;
-                  await db.saveSetting('isPremium', newVal);
-                  window.location.reload();
-                }}
-                className={`w-12 h-7 rounded-full transition-colors relative ${
-                  isPremium ? 'bg-success-500' : 'bg-gray-300'
-                }`}
-              >
-                <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform ${
-                  isPremium ? 'translate-x-6' : 'translate-x-1'
-                }`} />
-              </button>
-            </div>
-            <button
-              onClick={() => openConfirm({
-                title: 'Erase all data?',
-                message: 'This will permanently delete ALL accounts, transactions, recurring items, categories, and settings. The app will restart as if it were freshly installed.',
-                confirmWord: 'ERASE',
-                confirmLabel: 'Erase everything',
-                action: async () => {
-                  await db.clearAllData();
-                  window.location.reload();
-                },
-              })}
-              className="w-full px-4 py-3 text-left text-sm text-danger-500 font-medium"
-            >
-              Clear all data & restart
-            </button>
-          </div>
-          <p className="text-[10px] text-text-muted mt-1.5 text-center">Remove this section before App Store release</p>
         </div>
 
         {/* App info */}

@@ -480,21 +480,138 @@ export function getCurrentCycleStart(account) {
   return cycleStart.toISOString().split('T')[0];
 }
 
+// Get the cycle start date for a specific envelope based on its resetType/resetValue
+function getEnvelopeCycleStart(envelope, account) {
+  const resetType = envelope.resetType || 'duration';
+  const resetValue = envelope.resetValue || 'monthly';
+
+  if (resetType === 'cycle') {
+    // Tied to a specific pay cycle
+    const cycle = (account.payCycles || []).find(c => c.id === resetValue);
+    if (cycle?.nextPayDate && cycle?.frequency) {
+      // Build a temporary account-like object to reuse getCurrentCycleStart logic
+      return getCurrentCycleStart({
+        payCycles: [cycle],
+        payFrequency: cycle.frequency,
+        nextPayDate: cycle.nextPayDate,
+      });
+    }
+    // Fallback to account-level cycle
+    return getCurrentCycleStart(account);
+  }
+
+  // Fixed duration — walk backward from resetDate (the next reset)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const periodDays = resetValue === 'weekly' ? 7 : resetValue === 'biweekly' ? 14 : 30;
+
+  if (envelope.resetDate) {
+    let nextReset = new Date(envelope.resetDate + 'T00:00:00');
+
+    // Advance resetDate if it's in the past (same as pay cycle advancement)
+    while (nextReset < today) {
+      if (resetValue === 'monthly') {
+        nextReset.setMonth(nextReset.getMonth() + 1);
+      } else {
+        nextReset.setDate(nextReset.getDate() + periodDays);
+      }
+    }
+
+    // If today IS the reset date, cycle starts today
+    if (nextReset.getTime() === today.getTime()) {
+      return todayISO();
+    }
+
+    // Walk back one period from the next reset to get cycle start
+    const cycleStart = new Date(nextReset);
+    if (resetValue === 'monthly') {
+      cycleStart.setMonth(cycleStart.getMonth() - 1);
+    } else {
+      cycleStart.setDate(cycleStart.getDate() - periodDays);
+    }
+    return cycleStart.toISOString().split('T')[0];
+  }
+
+  // Fallback if no resetDate set — use calendar boundaries
+  switch (resetValue) {
+    case 'weekly': {
+      const start = new Date(today);
+      start.setDate(start.getDate() - start.getDay());
+      return start.toISOString().split('T')[0];
+    }
+    case 'biweekly': {
+      const epoch = new Date('2024-01-01T00:00:00');
+      const daysSinceEpoch = Math.floor((today - epoch) / 86400000);
+      const daysIntoCycle = daysSinceEpoch % 14;
+      const start = new Date(today);
+      start.setDate(start.getDate() - daysIntoCycle);
+      return start.toISOString().split('T')[0];
+    }
+    case 'monthly':
+    default: {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      return start.toISOString().split('T')[0];
+    }
+  }
+}
+
+// Get the total days in an envelope's reset period
+function getEnvelopePeriodDays(envelope, account) {
+  const resetType = envelope.resetType || 'duration';
+  const resetValue = envelope.resetValue || 'monthly';
+
+  if (resetType === 'cycle') {
+    const cycle = (account.payCycles || []).find(c => c.id === resetValue);
+    const freq = cycle?.frequency || account.payFrequency || 'biweekly';
+    switch (freq) {
+      case 'weekly': return 7;
+      case 'biweekly': return 14;
+      case 'semi-monthly': return 15;
+      case 'monthly': return 30;
+      default: return 14;
+    }
+  }
+
+  switch (resetValue) {
+    case 'weekly': return 7;
+    case 'biweekly': return 14;
+    case 'monthly': return 30;
+    default: return 30;
+  }
+}
+
+// Get the active pay cycle's length in days
+function getActivePayCycleDays(account) {
+  const cycles = account.payCycles || [];
+  const cycle = cycles.sort((a, b) => (a.nextPayDate || '').localeCompare(b.nextPayDate || ''))[0];
+  const freq = cycle?.frequency || account.payFrequency || 'biweekly';
+  switch (freq) {
+    case 'weekly': return 7;
+    case 'biweekly': return 14;
+    case 'semi-monthly': return 15;
+    case 'monthly': return 30;
+    default: return 14;
+  }
+}
+
 // Calculate envelope status for an account
 // Returns array of { categoryId, categoryName, budgeted, spent, remaining, percent }
 export function calculateEnvelopeStatus(account, transactions, categories) {
   const envelopes = account.envelopes || [];
   if (envelopes.length === 0) return [];
 
-  const cycleStart = getCurrentCycleStart(account);
   const today = todayISO();
+  const activePayCycleDays = getActivePayCycleDays(account);
 
   return envelopes
     .filter(env => env.isActive)
     .map(env => {
       const cat = categories.find(c => c.id === env.categoryId);
+      const cycleStart = getEnvelopeCycleStart(env, account);
+      const envelopePeriodDays = getEnvelopePeriodDays(env, account);
 
-      // Sum spending in this category since cycle start
+      // Sum spending in this category since envelope cycle start
       const spent = transactions
         .filter(tx => {
           if (tx.isAdjustment) return false;
@@ -511,6 +628,16 @@ export function calculateEnvelopeStatus(account, transactions, categories) {
       const overspent = spent > budgeted ? spent - budgeted : 0;
       const percent = budgeted > 0 ? Math.min(1, spent / budgeted) : 0;
 
+      // Prorate: if envelope period is longer than active pay cycle,
+      // only deduct the pay-cycle's share of the remaining budget
+      const isProrated = envelopePeriodDays > activePayCycleDays;
+      let proratedRemaining = remaining;
+      if (isProrated && envelopePeriodDays > 0) {
+        const ratio = activePayCycleDays / envelopePeriodDays;
+        const proratedBudget = budgeted * ratio;
+        proratedRemaining = Math.max(0, proratedBudget - spent);
+      }
+
       return {
         id: env.id,
         categoryId: env.categoryId,
@@ -520,14 +647,17 @@ export function calculateEnvelopeStatus(account, transactions, categories) {
         budgeted,
         spent: Math.round(spent * 100) / 100,
         remaining: Math.round(remaining * 100) / 100,
+        proratedRemaining: Math.round(proratedRemaining * 100) / 100,
         overspent: Math.round(overspent * 100) / 100,
         percent,
+        isProrated,
       };
     });
 }
 
 // Total remaining across all envelopes (what user still expects to spend)
+// Uses prorated amounts for envelopes whose period exceeds the active pay cycle
 export function getTotalEnvelopeRemaining(account, transactions, categories) {
   const statuses = calculateEnvelopeStatus(account, transactions, categories);
-  return statuses.reduce((sum, s) => sum + s.remaining, 0);
+  return statuses.reduce((sum, s) => sum + s.proratedRemaining, 0);
 }

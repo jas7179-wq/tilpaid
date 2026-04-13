@@ -19,13 +19,14 @@ const PAY_FREQUENCIES = [
 ];
 
 export default function SetupScreen() {
-  const { completeSetup } = useApp();
+  const { completeSetup, isPremium } = useApp();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [accountType, setAccountType] = useState('checking');
   const [balance, setBalance] = useState('');
   const [payFrequency, setPayFrequency] = useState('biweekly');
   const [nextPayDate, setNextPayDate] = useState('');
+  const [payAmount, setPayAmount] = useState('');
 
   const handleComplete = async () => {
     const label = ACCOUNT_TYPES.find((t) => t.type === accountType)?.label || 'Checking';
@@ -35,6 +36,7 @@ export default function SetupScreen() {
       balance: balance || '0',
       payFrequency,
       nextPayDate: nextPayDate || null,
+      payAmount: payAmount || null,
     });
   };
 
@@ -160,6 +162,38 @@ export default function SetupScreen() {
           style={{ maxWidth: '100%', WebkitAppearance: 'none' }}
         />
       </div>
+
+      {/* Paycheck amount (Premium) */}
+      {isPremium ? (
+        <div className="mb-8">
+          <label className="text-xs text-text-secondary uppercase tracking-wider block mb-2">
+            Paycheck amount (optional)
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-lg text-text-muted">$</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={payAmount}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '' || /^\d*\.?\d{0,2}$/.test(val)) {
+                  setPayAmount(val);
+                }
+              }}
+              className="flex-1 px-4 py-3 rounded-[10px] border border-border bg-surface-card text-lg focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 box-border"
+            />
+          </div>
+          <p className="text-xs text-text-muted mt-1.5">Auto-schedules your paycheck each cycle</p>
+        </div>
+      ) : (
+        <div className="mb-8">
+          <p className="text-[11px] text-brand-500 font-medium">
+            Premium: auto-schedule paychecks with amount
+          </p>
+        </div>
+      )}
 
       <button
         onClick={handleComplete}

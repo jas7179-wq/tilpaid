@@ -546,8 +546,16 @@ export default function HomeScreen() {
                           </span>
                           <span className="text-[9px] text-text-muted">{Math.round(env.percent * 100)}%</span>
                         </div>
+                        {env.isProrated && (
+                          <p className="text-[8px] text-text-muted mt-1 italic">Prorated to pay cycle</p>
+                        )}
                       </div>
                     ))}
+                    {envelopeStatuses.some(e => e.isProrated) && (
+                      <p className="text-[8px] text-text-muted text-center pt-1 italic">
+                        Some envelopes are prorated daily to fit your pay cycle and may not reflect actual spend. Align envelope and pay cycle periods for exact tracking.
+                      </p>
+                    )}
                   </div>
                 )}
 

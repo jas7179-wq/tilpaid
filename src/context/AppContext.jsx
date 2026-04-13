@@ -209,10 +209,18 @@ export function AppProvider({ children }) {
 
   // ── Actions ──
 
-  const completeSetup = useCallback(async ({ accountName, accountType, balance, payFrequency, nextPayDate }) => {
+  const completeSetup = useCallback(async ({ accountName, accountType, balance, payFrequency, nextPayDate, payAmount }) => {
+    const payCycles = payFrequency ? [{
+      id: Math.random().toString(36).slice(2, 10),
+      name: '',
+      frequency: payFrequency,
+      nextPayDate: nextPayDate || '',
+      ...(payAmount ? { amount: parseFloat(payAmount) } : {}),
+    }] : [];
+
     const account = createAccount({
       name: accountName, type: accountType, balance: parseFloat(balance),
-      payFrequency, nextPayDate,
+      payFrequency, nextPayDate, payCycles,
     });
     await db.saveAccount(account);
     await db.saveSetting('setupComplete', true);
@@ -259,12 +267,20 @@ export function AppProvider({ children }) {
     });
   }, [state]);
 
-  const addNewAccount = useCallback(async ({ name, type, balance, payFrequency, nextPayDate }) => {
+  const addNewAccount = useCallback(async ({ name, type, balance, payFrequency, nextPayDate, payAmount }) => {
     if (!canAddAccount) {
       return { error: 'Upgrade to Premium to add more accounts' };
     }
 
-    const account = createAccount({ name, type, balance: parseFloat(balance), payFrequency, nextPayDate });
+    const payCycles = payFrequency ? [{
+      id: Math.random().toString(36).slice(2, 10),
+      name: '',
+      frequency: payFrequency,
+      nextPayDate: nextPayDate || '',
+      ...(payAmount ? { amount: parseFloat(payAmount) } : {}),
+    }] : [];
+
+    const account = createAccount({ name, type, balance: parseFloat(balance), payFrequency, nextPayDate, payCycles });
     await db.saveAccount(account);
 
     dispatch({ type: 'ADD_ACCOUNT', payload: account });
