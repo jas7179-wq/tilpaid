@@ -2,8 +2,9 @@ import { createContext, useContext, useEffect, useReducer, useCallback } from 'r
 import * as db from '../lib/db';
 import * as sync from '../lib/sync';
 import * as api from '../lib/api';
-import { computeRunningBalances, computeCurrentBalance, createTransaction, createAccount, createReconciliation, advancePayCycleDate, getNextPayInfo } from '../lib/utils';
-
+import * as rc from '../lib/purchases';
+import * as auth from '../lib/auth';
+import { computeRunningBalances, computeCurrentBalance, createTransaction, createAccount, advancePayCycleDate, getNextPayInfo } from '../lib/utils';
 const AppContext = createContext(null);
 
 const MAX_FREE_ACCOUNTS = 1;
@@ -48,6 +49,12 @@ function reducer(state, action) {
         ...state,
         accounts: state.accounts.filter((a) => a.id !== action.payload),
       };
+    case 'SET_PAY_SETTINGS':
+      return {
+        ...state,
+        payFrequency: action.payload.payFrequency,
+        nextPayDate: action.payload.nextPayDate,
+      };
     default:
       return state;
   }
@@ -59,11 +66,27 @@ export function AppProvider({ children }) {
   useEffect(() => {
     async function init() {
       await db.initDefaultCategories();
+
+      // Initialize RevenueCat (no-op on web)
+      await rc.initRevenueCat();
+
+      // Initialize Google Sign-In (no-op if already initialized)
+      await auth.initGoogleAuth();
+
       const accounts = await db.getAccounts();
       const categories = await db.getCategories();
       const isSetupComplete = await db.getSetting('setupComplete');
-      const isPremium = await db.getSetting('isPremium');
       const lastActiveAccountId = await db.getSetting('lastActiveAccountId');
+
+      // Check premium status: RevenueCat on native, fallback to IndexedDB on web
+      let isPremium = false;
+      if (rc.isNative()) {
+        isPremium = await rc.checkPremiumStatus();
+        // Sync to IndexedDB so rest of app can read it
+        await db.saveSetting('isPremium', isPremium);
+      } else {
+        isPremium = await db.getSetting('isPremium');
+      }
 
       // Legacy global settings (fallback for existing users)
       const globalPayFrequency = await db.getSetting('payFrequency');
@@ -157,15 +180,16 @@ export function AppProvider({ children }) {
         },
       });
 
-      // Run initial cloud sync if signed in
-      if (api.isAuthenticated()) {
-        sync.initialSync().then(result => {
-          if (result.success && result.pulled > 0) {
-            // Re-init if cloud had changes
-            init();
-          }
-        });
-      }
+      // Run initial cloud sync if signed in (fire-and-forget)
+      // pullAll writes cloud data to IndexedDB; UI will pick it up on next render.
+      // We intentionally do NOT re-run init() here to avoid infinite sync loops.
+     if (api.isAuthenticated()) {
+       sync.initialSync().then(result => {
+     if (!result.success) {
+      console.warn('Initial sync failed:', result.error);
+    }
+  });
+}
     }
     init();
   }, []);
@@ -242,30 +266,31 @@ export function AppProvider({ children }) {
         categories: state.categories,
       },
     });
+
+    // Push initial setup data to cloud if user is signed in
+    sync.scheduleSync();
   }, [state.categories]);
 
   const switchAccount = useCallback(async (accountId) => {
-    const account = state.accounts.find(a => a.id === accountId);
-    if (!account) return;
+  const account = state.accounts.find(a => a.id === accountId);
+  if (!account) return;
 
-    const transactions = await db.getTransactions(accountId);
-    await db.saveSetting('lastActiveAccountId', accountId);
+  const transactions = await db.getTransactions(accountId);
+  await db.saveSetting('lastActiveAccountId', accountId);
 
-    dispatch({ type: 'SET_ACTIVE_ACCOUNT', payload: accountId });
-    dispatch({ type: 'SET_TRANSACTIONS', payload: transactions });
-    // Update pay settings from the new active account
-    dispatch({
-      type: 'INIT',
-      payload: {
-        ...state,
-        activeAccountId: accountId,
-        transactions,
-        payFrequency: account.payFrequency || null,
-        nextPayDate: account.nextPayDate || null,
-        isLoading: false,
-      },
-    });
-  }, [state]);
+  // Dispatch specific actions only — do NOT re-spread state, which would
+  // resurrect items removed by earlier dispatches in the same tick (e.g.,
+  // REMOVE_ACCOUNT before switchAccount in the delete flow).
+  dispatch({ type: 'SET_ACTIVE_ACCOUNT', payload: accountId });
+  dispatch({ type: 'SET_TRANSACTIONS', payload: transactions });
+  dispatch({
+    type: 'SET_PAY_SETTINGS',
+    payload: {
+      payFrequency: account.payFrequency || null,
+      nextPayDate: account.nextPayDate || null,
+    },
+  });
+}, [state.accounts]);
 
   const addNewAccount = useCallback(async ({ name, type, balance, payFrequency, nextPayDate, payAmount }) => {
     if (!canAddAccount) {
@@ -291,32 +316,55 @@ export function AppProvider({ children }) {
     dispatch({ type: 'SET_ACTIVE_ACCOUNT', payload: account.id });
     dispatch({ type: 'SET_TRANSACTIONS', payload: transactions });
 
+    // Push new account to cloud
+    sync.scheduleSync();
+
     return { success: true, account };
   }, [canAddAccount]);
 
-  const deleteAccountById = useCallback(async (accountId) => {
-    // Don't allow deleting the last account
-    if (state.accounts.length <= 1) {
-      return { error: 'Cannot delete your only account' };
-    }
+ const deleteAccountById = useCallback(async (accountId) => {
+  // Don't allow deleting the last account
+  if (state.accounts.length <= 1) {
+    return { error: 'Cannot delete your only account' };
+  }
 
-    // Delete all transactions for this account
-    const allTx = await db.getTransactions(accountId);
-    for (const tx of allTx) {
-      await db.deleteTransaction(tx.id);
-    }
+  // Soft-delete the account: mark as deleted, don't hard-remove.
+  // This lets the sync engine propagate the delete to the cloud.
+  // The server will set isDeleted: true, and other devices will remove
+  // it from their local DB on next pull.
+  const account = await db.getAccount(accountId);
+  if (account) {
+    await db.saveAccount({
+      ...account,
+      isDeleted: true,
+      updatedAt: Date.now(),
+    });
+  }
 
-    await db.deleteAccount(accountId);
-    dispatch({ type: 'REMOVE_ACCOUNT', payload: accountId });
+  // Soft-delete all transactions for this account too so sync can propagate.
+  const allTx = await db.getTransactions(accountId);
+  for (const tx of allTx) {
+    await db.saveTransaction({
+      ...tx,
+      isDeleted: true,
+      updatedAt: Date.now(),
+    });
+  }
 
-    // Switch to another account
-    const remaining = state.accounts.filter(a => a.id !== accountId);
-    if (remaining.length > 0) {
-      await switchAccount(remaining[0].id);
-    }
+  // Remove from in-memory state so the UI updates immediately.
+  dispatch({ type: 'REMOVE_ACCOUNT', payload: accountId });
 
-    return { success: true };
-  }, [state.accounts, switchAccount]);
+  // Switch to another account
+  const remaining = state.accounts.filter(a => a.id !== accountId);
+  if (remaining.length > 0) {
+    await switchAccount(remaining[0].id);
+  }
+
+  // Push the soft-delete to cloud
+  sync.scheduleSync();
+
+  return { success: true };
+}, [state.accounts, switchAccount]);
 
   const addTransaction = useCallback(async ({ amount, description, categoryId, date, type }) => {
     if (!state.activeAccountId) return;
@@ -350,15 +398,10 @@ export function AppProvider({ children }) {
     await syncAccountBalance();
   }, [state.activeAccountId, currentBalance, syncAccountBalance]);
 
-  const reconcile = useCallback(async ({ balance, matched }) => {
+ const reconcile = useCallback(async ({ balance, matched }) => {
     if (!state.activeAccountId) return;
-    const recon = createReconciliation({
-      accountId: state.activeAccountId,
-      balance: parseFloat(balance),
-      matched,
-    });
-    await db.saveReconciliation(recon);
-
+    
+    // Update the account's lastReconciledAt timestamp
     const account = await db.getAccount(state.activeAccountId);
     const updated = { ...account, lastReconciledAt: Date.now(), updatedAt: Date.now() };
     await db.saveAccount(updated);
@@ -366,6 +409,10 @@ export function AppProvider({ children }) {
 
     if (!matched) {
       await adjustBalance({ newBalance: balance, note: 'Weekly reconciliation adjustment' });
+      // adjustBalance → syncAccountBalance → scheduleSync, so we're covered
+    } else {
+      // No balance change, but we did update lastReconciledAt
+      sync.scheduleSync();
     }
   }, [state.activeAccountId, adjustBalance]);
 
@@ -383,7 +430,14 @@ export function AppProvider({ children }) {
       }
     }
 
-    await db.deleteTransaction(id);
+    // Soft-delete so the tombstone reaches the server
+    if (tx) {
+      await db.saveTransaction({
+        ...tx,
+        isDeleted: true,
+        updatedAt: Date.now(),
+      });
+    }
     await syncAccountBalance();
     return { success: true };
   }, [state.activeAccountId, lastAdjustment, syncAccountBalance]);
@@ -393,12 +447,17 @@ export function AppProvider({ children }) {
     await syncAccountBalance();
   }, [state.activeAccountId, syncAccountBalance]);
 
-  const resetAccount = useCallback(async ({ newBalance }) => {
+ const resetAccount = useCallback(async ({ newBalance }) => {
     if (!state.activeAccountId) return;
 
+    // Soft-delete each transaction so the tombstone reaches the server
     const allTx = await db.getTransactions(state.activeAccountId);
     for (const tx of allTx) {
-      await db.deleteTransaction(tx.id);
+      await db.saveTransaction({
+        ...tx,
+        isDeleted: true,
+        updatedAt: Date.now(),
+      });
     }
 
     const account = await db.getAccount(state.activeAccountId);
@@ -413,6 +472,9 @@ export function AppProvider({ children }) {
 
     dispatch({ type: 'SET_TRANSACTIONS', payload: [] });
     dispatch({ type: 'UPDATE_ACCOUNT', payload: updated });
+
+    // Push all the tombstones and updated balance to cloud
+    sync.scheduleSync();
   }, [state.activeAccountId]);
 
   // ── Auth Actions ──
@@ -425,15 +487,35 @@ export function AppProvider({ children }) {
         result = await api.signInWithGoogle(credential);
       }
       if (result?.token) {
+        // Identify this user to RevenueCat so its webhooks carry our User.id
+        // as app_user_id. Without this, RC tracks against an anonymous ID
+        // that the server can't map back. Safe to call multiple times.
+        if (result.user?.id) {
+          await rc.setRevenueCatUser(result.user.id);
+        }
+
+        // Verify premium with the server (which checks RC REST API).
+        // Catches the case where the user already had premium on a previous
+        // device and the webhook hasn't fired on this install. Non-fatal.
+        let verifiedPremium = null;
+        try {
+          verifiedPremium = await api.syncPremium();
+        } catch (err) {
+          console.warn('Premium sync failed (non-fatal):', err);
+        }
+
         // Pull cloud data after sign-in
         const syncResult = await sync.initialSync();
         if (syncResult.success && syncResult.pulled > 0) {
           window.location.reload(); // reload to pick up cloud data
         }
-        // Update premium status from cloud
-        if (result.user?.isPremium !== undefined) {
-          await db.saveSetting('isPremium', result.user.isPremium);
-          dispatch({ type: 'INIT', payload: { ...state, isPremium: result.user.isPremium, isLoading: false } });
+
+        // Update premium status from server-verified result, falling back
+        // to whatever the sign-in payload said (the /me cached value).
+        const finalPremium = verifiedPremium?.isPremium ?? result.user?.isPremium;
+        if (finalPremium !== undefined) {
+          await db.saveSetting('isPremium', finalPremium);
+          dispatch({ type: 'INIT', payload: { ...state, isPremium: finalPremium, isLoading: false } });
         }
       }
       return result;
@@ -444,8 +526,43 @@ export function AppProvider({ children }) {
 
   const signOutUser = useCallback(async () => {
     await api.signOut();
+    // Clear RevenueCat identity so the next user signing in on this device
+    // doesn't briefly inherit the previous user's entitlement state.
+    await rc.clearRevenueCatUser();
+    // Also clear the Capacitor GoogleAuth session — without this, the next
+    // sign-in attempt silently re-uses the same Google account instead of
+    // showing the account picker.
+    await auth.signOutGoogle();
     // Don't clear local data — just disconnect from cloud
   }, []);
+
+  // Re-check premium status. Server is the authority when signed in (asks RC
+  // REST API and updates DB). Falls back to local SDK / IndexedDB otherwise.
+  // Call after a purchase, on app resume, or when restoring purchases.
+  const refreshPremium = useCallback(async () => {
+    let isPremium = false;
+
+    if (api.isAuthenticated()) {
+      try {
+        const result = await api.syncPremium();
+        isPremium = !!result?.isPremium;
+      } catch (err) {
+        console.warn('Server premium sync failed, falling back to local:', err);
+        isPremium = rc.isNative()
+          ? await rc.checkPremiumStatus()
+          : await db.getSetting('isPremium');
+      }
+    } else {
+      // Not signed in — fall back to local SDK / IndexedDB.
+      isPremium = rc.isNative()
+        ? await rc.checkPremiumStatus()
+        : await db.getSetting('isPremium');
+    }
+
+    await db.saveSetting('isPremium', isPremium);
+    dispatch({ type: 'INIT', payload: { ...state, isPremium: !!isPremium, isLoading: false } });
+    return isPremium;
+  }, [state]);
 
   const isSignedIn = api.isAuthenticated();
 
@@ -469,6 +586,7 @@ export function AppProvider({ children }) {
     resetAccount,
     signIn,
     signOutUser,
+    refreshPremium,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
