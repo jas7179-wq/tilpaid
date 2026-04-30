@@ -5,6 +5,7 @@ import { generateId, formatCurrency } from '../lib/utils';
 import * as db from '../lib/db';
 import * as api from '../lib/api';
 import * as sync from '../lib/sync';
+import * as auth from '../lib/auth';
 import BottomNav from '../components/BottomNav';
 import { Plus, Pencil, Trash2, X, Check, RotateCcw, Download, Cloud, CloudOff, RefreshCw, LogOut, ChevronLeft } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
@@ -55,7 +56,7 @@ function GoogleLogo({ className }) {
 }
 
 export default function SettingsScreen() {
-  const { categories, activeAccount, payFrequency, nextPayDate, resetAccount, accounts, deleteAccountById, canAddAccount, isPremium } = useApp();
+  const { categories, activeAccount, payFrequency, nextPayDate, resetAccount, accounts, deleteAccountById, canAddAccount, isPremium, signIn, signOutUser } = useApp();
   const navigate = useNavigate();
   const [editingCat, setEditingCat] = useState(null);
   const [newCatName, setNewCatName] = useState('');
@@ -99,10 +100,9 @@ export default function SettingsScreen() {
   const handleAppleSignIn = async () => {
     setAuthLoading(true);
     try {
-      // Apple Sign In via Sign In with Apple JS SDK
-      // This will be wired up when Apple Developer credentials are ready
-      // For now, show a placeholder
-      alert('Apple Sign In will be available soon — waiting on developer account setup.');
+      // TODO: Apple Sign In integration (developer enrollment now approved,
+      // but apple-signin-auth flow not yet wired up in the app)
+      alert('Apple Sign In coming soon.');
     } catch (err) {
       console.error('Apple sign-in failed:', err);
     } finally {
@@ -113,19 +113,35 @@ export default function SettingsScreen() {
   const handleGoogleSignIn = async () => {
     setAuthLoading(true);
     try {
-      // Google Sign In via Google Identity Services
-      // This will be wired up when Google OAuth credentials are ready
-      // For now, show a placeholder
-      alert('Google Sign In will be available soon — waiting on developer account setup.');
+      const credential = await auth.getGoogleCredential();
+      const result = await signIn('google', credential);
+
+      if (result?.error) {
+        console.error('Backend sign-in failed:', result.error);
+        alert('Sign-in failed. Please try again.');
+        return;
+      }
+
+      if (result?.token) {
+        setIsSignedIn(true);
+        setUserProfile(credential.profile);
+        setSyncStatus(sync.getSyncStatus());
+      }
     } catch (err) {
+      if (auth.isUserCancelled(err)) {
+        // User closed the sign-in sheet — no UI feedback needed
+        return;
+      }
       console.error('Google sign-in failed:', err);
+      alert('Sign-in failed. Please try again.');
     } finally {
       setAuthLoading(false);
     }
   };
 
   const handleSignOut = async () => {
-    api.signOut();
+    // signOutUser handles: api.signOut, rc.clearRevenueCatUser, auth.signOutGoogle
+    await signOutUser();
     setIsSignedIn(false);
     setUserProfile(null);
     setSyncStatus(sync.getSyncStatus());
