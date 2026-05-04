@@ -88,6 +88,24 @@ export function AppProvider({ children }) {
         isPremium = await db.getSetting('isPremium');
       }
 
+      // Re-verify with server when local says premium (catches stale-true after
+      // sandbox / production sub expiration). Skipped when local says false —
+      // free users can hit "Restore purchases" if they need to refresh upward.
+      // Skipped when not signed in — server can't verify without a JWT.
+      if (isPremium && api.isAuthenticated()) {
+        try {
+          const verified = await api.syncPremium();
+          if (verified?.isPremium !== undefined && verified.isPremium !== isPremium) {
+            isPremium = verified.isPremium;
+            await db.saveSetting('isPremium', isPremium);
+          }
+        } catch (err) {
+          // Server unreachable — proceed with local value, don't block app launch.
+          console.warn('Premium sync on launch failed (non-fatal):', err);
+        }
+      }
+
+
       // Legacy global settings (fallback for existing users)
       const globalPayFrequency = await db.getSetting('payFrequency');
       const globalNextPayDate = await db.getSetting('nextPayDate');
