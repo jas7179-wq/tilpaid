@@ -6,6 +6,7 @@ import * as db from '../lib/db';
 import * as api from '../lib/api';
 import * as sync from '../lib/sync';
 import * as auth from '../lib/auth';
+import * as rc from '../lib/purchases';
 import BottomNav from '../components/BottomNav';
 import { Plus, Pencil, Trash2, X, Check, RotateCcw, Download, Cloud, CloudOff, RefreshCw, LogOut, ChevronLeft } from 'lucide-react';
 import ConfirmModal from '../components/ConfirmModal';
@@ -56,7 +57,7 @@ function GoogleLogo({ className }) {
 }
 
 export default function SettingsScreen() {
-  const { categories, activeAccount, payFrequency, nextPayDate, resetAccount, accounts, deleteAccountById, canAddAccount, isPremium, signIn, signOutUser } = useApp();
+  const { categories, activeAccount, payFrequency, nextPayDate, resetAccount, accounts, deleteAccountById, canAddAccount, isPremium, signIn, signOutUser, refreshPremium } = useApp();
   const navigate = useNavigate();
   const [editingCat, setEditingCat] = useState(null);
   const [newCatName, setNewCatName] = useState('');
@@ -84,6 +85,9 @@ export default function SettingsScreen() {
   const [authLoading, setAuthLoading] = useState(false);
   const [syncStatus, setSyncStatus] = useState(sync.getSyncStatus());
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Purchase state
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
 
   // Confirm modal states
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, action: null, title: '', message: '', confirmWord: null, confirmLabel: '' });
@@ -145,6 +149,75 @@ export default function SettingsScreen() {
     setIsSignedIn(false);
     setUserProfile(null);
     setSyncStatus(sync.getSyncStatus());
+  };
+
+  // ── Purchase Handler ──
+
+  const handleUpgrade = async () => {
+    if (!rc.isNative()) {
+      alert('Premium upgrades are only available in the mobile app.');
+      return;
+    }
+
+    setPurchaseLoading(true);
+    try {
+      const offering = await rc.getOfferings();
+      if (!offering || !offering.availablePackages || offering.availablePackages.length === 0) {
+        alert('No subscription plans available right now. Please try again later.');
+        return;
+      }
+
+      // Use the first available package — we only have one (monthly $2.99).
+      // If we add more later, swap this for a package picker UI.
+      const pkg = offering.availablePackages[0];
+
+      const result = await rc.purchasePackage(pkg);
+
+      if (result.error === 'cancelled') {
+        // User cancelled the Play Store sheet — no UI feedback needed
+        return;
+      }
+
+      if (!result.success) {
+        console.error('Purchase failed:', result.error);
+        alert(`Purchase failed: ${result.error || 'Unknown error'}`);
+        return;
+      }
+
+      // Purchase succeeded. Refresh server-side premium status — calls
+      // /api/auth/sync-premium which verifies with RC's REST API and updates
+      // User.isPremium in the DB. This closes the race between purchase and
+      // webhook delivery.
+      await refreshPremium();
+      alert('Welcome to TilPaid Premium!');
+    } catch (err) {
+      console.error('Upgrade flow failed:', err);
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    if (!rc.isNative()) return;
+
+    setPurchaseLoading(true);
+    try {
+      const result = await rc.restorePurchases();
+      if (!result.success) {
+        alert(`Restore failed: ${result.error || 'Unknown error'}`);
+        return;
+      }
+      await refreshPremium();
+      alert(result.isPremium
+        ? 'Premium restored.'
+        : 'No active subscriptions found on this account.');
+    } catch (err) {
+      console.error('Restore failed:', err);
+      alert('Restore failed. Please try again.');
+    } finally {
+      setPurchaseLoading(false);
+    }
   };
 
   const handleSync = async () => {
@@ -1020,18 +1093,43 @@ export default function SettingsScreen() {
         </div>
 
         {/* Premium upsell */}
-        <div className="mb-8">
-          <div className="bg-gradient-to-br from-brand-50 to-success-50 rounded-3xl border border-brand-100 p-5 shadow-sm">
-            <p className="text-base font-semibold text-brand-700 mb-1">TilPaid Premium</p>
-            <p className="text-sm text-brand-600 leading-relaxed mb-4">
-              Recurring bills & deposits, look-ahead view, savings targets, spending trend alerts, 
-              joint account access, custom warning thresholds, and more.
-            </p>
-            <button className="w-full py-3.5 rounded-2xl bg-brand-500 text-white text-sm font-medium active:scale-[0.98] transition-transform">
-              Coming soon
-            </button>
+        {!isPremium && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-br from-brand-50 to-success-50 rounded-3xl border border-brand-100 p-5 shadow-sm">
+              <p className="text-base font-semibold text-brand-700 mb-1">TilPaid Premium</p>
+              <p className="text-sm text-brand-600 leading-relaxed mb-4">
+                Recurring bills & deposits, look-ahead view, savings targets, spending trend alerts,
+                joint account access, custom warning thresholds, and more.
+              </p>
+              <button
+                onClick={handleUpgrade}
+                disabled={purchaseLoading}
+                className="w-full py-3.5 rounded-2xl bg-brand-500 text-white text-sm font-medium active:scale-[0.98] transition-transform disabled:opacity-60"
+              >
+                {purchaseLoading ? 'Processing...' : 'Upgrade — $2.99/month'}
+              </button>
+              <button
+                onClick={handleRestorePurchases}
+                disabled={purchaseLoading}
+                className="w-full mt-2 py-2 text-xs text-brand-600 hover:underline disabled:opacity-60"
+              >
+                Restore purchases
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Premium status (if subscribed) */}
+        {isPremium && (
+          <div className="mb-8">
+            <div className="bg-gradient-to-br from-success-50 to-brand-50 rounded-3xl border border-success-200 p-5 shadow-sm">
+              <p className="text-base font-semibold text-brand-700 mb-1">✨ TilPaid Premium</p>
+              <p className="text-sm text-brand-600 leading-relaxed">
+                You have full access to all premium features. Manage your subscription in the Play Store.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Clear & Start Fresh */}
         <div className="mb-6">
