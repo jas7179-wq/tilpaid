@@ -6,6 +6,7 @@ import * as db from '../lib/db';
 import * as api from '../lib/api';
 import * as sync from '../lib/sync';
 import * as auth from '../lib/auth';
+import * as apple from '../lib/apple';
 import * as rc from '../lib/purchases';
 import BottomNav from '../components/BottomNav';
 import { Plus, Pencil, Trash2, X, Check, RotateCcw, Download, Cloud, CloudOff, RefreshCw, LogOut, ChevronLeft } from 'lucide-react';
@@ -104,11 +105,27 @@ export default function SettingsScreen() {
   const handleAppleSignIn = async () => {
     setAuthLoading(true);
     try {
-      // TODO: Apple Sign In integration (developer enrollment now approved,
-      // but apple-signin-auth flow not yet wired up in the app)
-      alert('Apple Sign In coming soon.');
+      const credential = await apple.getAppleCredential();
+      const result = await signIn('apple', credential);
+
+      if (result?.error) {
+        console.error('Backend sign-in failed:', result.error);
+        alert('Sign-in failed. Please try again.');
+        return;
+      }
+
+      if (result?.token) {
+        setIsSignedIn(true);
+        setUserProfile(credential.profile);
+        setSyncStatus(sync.getSyncStatus());
+      }
     } catch (err) {
+      if (apple.isUserCancelled(err)) {
+        // User closed the Apple sign-in flow — no UI feedback needed
+        return;
+      }
       console.error('Apple sign-in failed:', err);
+      alert('Sign-in failed. Please try again.');
     } finally {
       setAuthLoading(false);
     }

@@ -4,6 +4,9 @@ import { useApp } from '../context/AppContext';
 import { todayISO } from '../lib/utils';
 import { addDays, addWeeks, format } from 'date-fns';
 import { DollarSign } from 'lucide-react';
+import * as auth from '../lib/auth';
+import * as apple from '../lib/apple';
+import * as sync from '../lib/sync';
 
 const ACCOUNT_TYPES = [
   { type: 'checking', label: 'Checking' },
@@ -19,7 +22,7 @@ const PAY_FREQUENCIES = [
 ];
 
 export default function SetupScreen() {
-  const { completeSetup, isPremium } = useApp();
+  const { completeSetup, isPremium, signIn } = useApp();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [accountType, setAccountType] = useState('checking');
@@ -27,6 +30,53 @@ export default function SetupScreen() {
   const [payFrequency, setPayFrequency] = useState('biweekly');
   const [nextPayDate, setNextPayDate] = useState('');
   const [payAmount, setPayAmount] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // ── Auth Handlers ──
+
+  const handleAppleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      const credential = await apple.getAppleCredential();
+      const result = await signIn('apple', credential);
+
+      if (result?.error) {
+        console.error('Backend sign-in failed:', result.error);
+        alert('Sign-in failed. Please try again.');
+        return;
+      }
+      // Successful sign-in: AppContext will trigger a state update + cloud
+      // pull. If they have prior cloud data, they'll skip past Setup entirely.
+      // If not, they'll continue to step 1 (account setup) next render.
+    } catch (err) {
+      if (apple.isUserCancelled(err)) return;
+      console.error('Apple sign-in failed:', err);
+      alert('Sign-in failed. Please try again.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthLoading(true);
+    try {
+      const credential = await auth.getGoogleCredential();
+      const result = await signIn('google', credential);
+
+      if (result?.error) {
+        console.error('Backend sign-in failed:', result.error);
+        alert('Sign-in failed. Please try again.');
+        return;
+      }
+    } catch (err) {
+      if (auth.isUserCancelled(err)) return;
+      console.error('Google sign-in failed:', err);
+      alert('Sign-in failed. Please try again.');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
 
   const handleComplete = async () => {
     const label = ACCOUNT_TYPES.find((t) => t.type === accountType)?.label || 'Checking';
@@ -50,15 +100,24 @@ export default function SetupScreen() {
         <p className="text-text-secondary text-[15px] mb-10">Know what's left til payday</p>
 
         <div className="w-full max-w-sm space-y-3">
-          <button className="w-full py-3.5 rounded-[10px] bg-black text-white text-[15px] font-medium flex items-center justify-center gap-2">
+          <button
+            onClick={handleAppleSignIn}
+            disabled={authLoading}
+            className="w-full py-3.5 rounded-[10px] bg-black text-white text-[15px] font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+          >
              Sign in with Apple
           </button>
-          <button className="w-full py-3.5 rounded-[10px] bg-surface-card text-text border border-border text-[15px] font-medium flex items-center justify-center gap-2">
+          <button
+            onClick={handleGoogleSignIn}
+            disabled={authLoading}
+            className="w-full py-3.5 rounded-[10px] bg-surface-card text-text border border-border text-[15px] font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+          >
             G Sign in with Google
           </button>
           <button
             onClick={() => setStep(1)}
-            className="w-full py-3 text-brand-500 text-sm font-medium"
+            disabled={authLoading}
+            className="w-full py-3 text-brand-500 text-sm font-medium disabled:opacity-60"
           >
             Skip for now — start local
           </button>
