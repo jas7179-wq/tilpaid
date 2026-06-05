@@ -1,3 +1,16 @@
+diff --git a/node_modules/@capacitor-community/apple-sign-in/Package.swift b/node_modules/@capacitor-community/apple-sign-in/Package.swift
+index 94246df..12de75d 100644
+--- a/node_modules/@capacitor-community/apple-sign-in/Package.swift
++++ b/node_modules/@capacitor-community/apple-sign-in/Package.swift
+@@ -10,7 +10,7 @@ let package = Package(
+             targets: ["SignInWithApple"])
+     ],
+     dependencies: [
+-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0")
++        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", "7.0.0"..<"9.0.0")
+     ],
+     targets: [
+         .target(
 diff --git a/node_modules/@capacitor-community/apple-sign-in/android/build.gradle b/node_modules/@capacitor-community/apple-sign-in/android/build.gradle
 index b045a5b..744d5b5 100644
 --- a/node_modules/@capacitor-community/apple-sign-in/android/build.gradle
